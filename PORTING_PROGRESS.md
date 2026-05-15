@@ -81,3 +81,15 @@ Source reference only: `D:\VisualStudioCode\Python` (Python code is not edited)
 - Added combo selection change hooks (`cboPort`, `cboArduinoPort`) to refresh button states immediately.
 - Ensured app close path clears Arduino connected state and disposes serial resources.
 - Verification: `dotnet build -t:Compile` passed (existing nullable warning in designer remains).
+
+## 2026-05-14 - Step 1 + Step 2 wiring (connection-gated workflow + control path)
+- Added workflow state gating in `MainForm.cs` so controls are enabled/disabled based on live connection state:
+  - Telemetry controls require FC connection.
+  - PID workflow controls require FC connection and are disabled during channel-test activity.
+  - Channel test controls require at least one control path (FC direct or Arduino TX).
+- Added active control-path selection logic:
+  - Prefers Arduino path when Arduino is connected.
+  - Falls back to FC direct when FC is connected.
+  - Displays current path in channel visual status (`Path: ...`) when idle.
+- Channel test status now explicitly includes path used (e.g. `via Arduino TX` or `via FC Direct`).
+- Compile verification: `dotnet build -t:Compile` passed (existing designer warning only).

@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Globalization;
 using System.Drawing.Drawing2D;
+using System.IO.Ports;
+using System.Management;
 using DronePidTuningAssistant.WinForms.Models;
 using DronePidTuningAssistant.WinForms.Services;
 using WeifenLuo.WinFormsUI.Docking;
@@ -10,6 +12,13 @@ namespace DronePidTuningAssistant.WinForms;
 
 public sealed partial class MainForm : Form
 {
+    private enum ControlPath
+    {
+        None = 0,
+        FcDirect = 1,
+        ArduinoTransmitter = 2,
+    }
+
     private const int FixedSerialBaud = 115200;
     private const string PersistKeyTelemetry = "panel.telemetry";
     private const string PersistKeyChannelTest = "panel.channel_test";
@@ -28,6 +37,7 @@ public sealed partial class MainForm : Form
     private DockPanel? _dockWorkspace;
     private bool _dockWorkspaceInitialized;
     private bool _dockRecoveryAttempted;
+    private bool _startupScanInProgress;
     private string? _activeAxis;
     private int _rollIteration;
     private int _pitchIteration;
@@ -45,6 +55,7 @@ public sealed partial class MainForm : Form
         ConfigureChannelCombo(cboRoll);
         ConfigureChannelCombo(cboPitch);
         ConfigureChannelCombo(cboThrottle);
+        Shown += async (_, _) => await DiscoverPortsOnStartupAsync();
         cboPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
         cboArduinoPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
         LoadSerialDefaults();
@@ -54,6 +65,180 @@ public sealed partial class MainForm : Form
         InitializePidWorkflow();
         UpdateSerialConnectionUi();
         InitializeDockWorkspace();
+    }
+
+    private async Task DiscoverPortsOnStartupAsync()
+    {
+        _startupScanInProgress = true;
+        lblStatus.Text = "Startup scan in progress...";
+        UpdateSerialConnectionUi();
+
+        try
+        {
+            var result = await Task.Run(() =>
+            {
+                var available = _serialPortService.GetAvailablePorts().ToList();
+                var responsive = available.Where(IsPortResponsive).ToList();
+                var source = responsive.Count > 0 ? responsive : available;
+                var friendlyByPort = GetPortFriendlyNames();
+
+                string? fcConnectedPort = null;
+                var fcCandidates = source
+                    .OrderByDescending(p => friendlyByPort.TryGetValue(p, out var n) && IsLikelyFcPort(n))
+                    .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                foreach (var candidate in fcCandidates.Take(Math.Min(2, fcCandidates.Count)))
+                {
+                    try
+                    {
+                        _serialPortService.Connect(candidate, FixedSerialBaud);
+                        fcConnectedPort = candidate;
+                        break;
+                    }
+                    catch
+                    {
+                        // Try next FC candidate.
+                    }
+                }
+
+                string? arduinoPort = null;
+                var arduinoPreferred = source
+                    .Where(p => !string.Equals(p, fcConnectedPort, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(p => friendlyByPort.TryGetValue(p, out var n) && IsLikelyArduinoPort(n))
+                    .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                foreach (var candidate in arduinoPreferred)
+                {
+                    if (TryOpenPort(candidate))
+                    {
+                        arduinoPort = candidate;
+                        break;
+                    }
+                }
+
+                return (source, fcConnectedPort, arduinoPort);
+            });
+
+            PopulatePortCombos(result.source);
+
+            if (!string.IsNullOrWhiteSpace(result.fcConnectedPort) && cboPort.Items.Contains(result.fcConnectedPort))
+            {
+                cboPort.SelectedItem = result.fcConnectedPort;
+            }
+            else if (cboPort.Items.Count > 0 && cboPort.SelectedIndex < 0)
+            {
+                cboPort.SelectedIndex = 0;
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.arduinoPort) && cboArduinoPort.Items.Contains(result.arduinoPort))
+            {
+                cboArduinoPort.SelectedItem = result.arduinoPort;
+                _arduinoConnected = true;
+            }
+            else
+            {
+                _arduinoConnected = false;
+                if (cboArduinoPort.Items.Count > 0 && cboArduinoPort.SelectedIndex < 0)
+                {
+                    cboArduinoPort.SelectedIndex = 0;
+                }
+            }
+
+            if (result.source.Count == 0)
+            {
+                lblStatus.Text = "Startup scan: no serial ports detected.";
+            }
+            else if (!string.IsNullOrWhiteSpace(result.fcConnectedPort))
+            {
+                var arduinoText = string.IsNullOrWhiteSpace(result.arduinoPort)
+                    ? "Arduino not connected."
+                    : $"Arduino on {result.arduinoPort}.";
+                lblStatus.Text = $"Startup auto-connect: FC on {result.fcConnectedPort}@{FixedSerialBaud}. {arduinoText}";
+            }
+            else
+            {
+                lblStatus.Text = "Startup auto-connect: FC not connected (tried top 2 candidates).";
+            }
+        }
+        finally
+        {
+            _startupScanInProgress = false;
+            UpdateSerialConnectionUi();
+        }
+    }
+
+    private static bool IsLikelyArduinoPort(string friendlyName)
+    {
+        if (string.IsNullOrWhiteSpace(friendlyName))
+        {
+            return false;
+        }
+
+        var text = friendlyName.ToLowerInvariant();
+        return text.Contains("arduino")
+            || text.Contains("ch340")
+            || text.Contains("cp210")
+            || text.Contains("usb serial")
+            || text.Contains("wchusbserial")
+            || text.Contains("silicon labs");
+    }
+
+    private static bool IsLikelyFcPort(string friendlyName)
+    {
+        if (string.IsNullOrWhiteSpace(friendlyName))
+        {
+            return false;
+        }
+
+        var text = friendlyName.ToLowerInvariant();
+        return text.Contains("stm32")
+            || text.Contains("vcp")
+            || text.Contains("virtual com")
+            || text.Contains("betaflight")
+            || text.Contains("inav")
+            || text.Contains("flight controller");
+    }
+
+    private static Dictionary<string, string> GetPortFriendlyNames()
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_PnPEntity WHERE Name LIKE '%(COM%'");
+            using var objects = searcher.Get();
+            foreach (ManagementObject obj in objects)
+            {
+                var name = obj["Name"]?.ToString();
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                var start = name.LastIndexOf("(COM", StringComparison.OrdinalIgnoreCase);
+                if (start < 0)
+                {
+                    continue;
+                }
+                var end = name.IndexOf(')', start);
+                if (end < 0)
+                {
+                    continue;
+                }
+
+                var port = name.Substring(start + 1, end - start - 1).Trim();
+                if (!string.IsNullOrWhiteSpace(port))
+                {
+                    result[port] = name;
+                }
+            }
+        }
+        catch
+        {
+            // Ignore WMI failures and fall back to generic probing.
+        }
+        return result;
     }
 
     private static void ConfigureChannelCombo(ComboBox combo)
@@ -113,6 +298,15 @@ public sealed partial class MainForm : Form
     private void RefreshPortList()
     {
         var ports = _serialPortService.GetAvailablePorts();
+        PopulatePortCombos(ports);
+        lblStatus.Text = ports.Count == 0
+            ? "No serial ports detected."
+            : $"Detected {ports.Count} serial port(s).";
+        UpdateSerialConnectionUi();
+    }
+
+    private void PopulatePortCombos(IReadOnlyList<string> ports)
+    {
         var previousSelection = cboPort.SelectedItem as string;
         var previousArduinoSelection = cboArduinoPort.SelectedItem as string;
 
@@ -140,11 +334,31 @@ public sealed partial class MainForm : Form
         {
             cboArduinoPort.SelectedIndex = 0;
         }
+    }
 
-        lblStatus.Text = ports.Count == 0
-            ? "No serial ports detected."
-            : $"Detected {ports.Count} serial port(s).";
-        UpdateSerialConnectionUi();
+    private static bool IsPortResponsive(string portName)
+    {
+        return TryOpenPort(portName);
+    }
+
+    private static bool TryOpenPort(string portName)
+    {
+        try
+        {
+            using var probe = new SerialPort(portName, FixedSerialBaud)
+            {
+                ReadTimeout = 150,
+                WriteTimeout = 150,
+                DtrEnable = false,
+                RtsEnable = false,
+            };
+            probe.Open();
+            return probe.IsOpen;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void ConnectUsb()
@@ -202,18 +416,70 @@ public sealed partial class MainForm : Form
     {
         var fcConnected = _serialPortService.IsConnected;
         var fcPortSelected = cboPort.SelectedItem is string fcPort && !string.IsNullOrWhiteSpace(fcPort);
-        btnConnect.Enabled = !fcConnected && fcPortSelected;
+        btnConnect.Enabled = !_startupScanInProgress && !fcConnected && fcPortSelected;
         btnDisconnect.Enabled = fcConnected;
 
         var arduinoPortSelected = cboArduinoPort.SelectedItem is string arduinoPort && !string.IsNullOrWhiteSpace(arduinoPort);
-        btnArduinoConnect.Enabled = !_arduinoConnected && arduinoPortSelected;
+        btnArduinoConnect.Enabled = !_startupScanInProgress && !_arduinoConnected && arduinoPortSelected;
         btnArduinoDisconnect.Enabled = _arduinoConnected;
+        UpdateWorkflowUiState();
+    }
+
+    private ControlPath GetActiveControlPath()
+    {
+        if (_arduinoConnected)
+        {
+            return ControlPath.ArduinoTransmitter;
+        }
+        if (_serialPortService.IsConnected)
+        {
+            return ControlPath.FcDirect;
+        }
+        return ControlPath.None;
+    }
+
+    private static string DescribeControlPath(ControlPath path)
+    {
+        return path switch
+        {
+            ControlPath.ArduinoTransmitter => "Arduino TX",
+            ControlPath.FcDirect => "FC Direct",
+            _ => "Not connected",
+        };
+    }
+
+    private void UpdateWorkflowUiState()
+    {
+        var fcConnected = _serialPortService.IsConnected;
+        var telemetryRunning = _telemetryTimer?.Enabled == true;
+        var activePath = GetActiveControlPath();
+        var canRunChannelTests = activePath != ControlPath.None;
+
+        if (!_channelTestRunning)
+        {
+            btnTestRoll.Enabled = canRunChannelTests;
+            btnTestPitch.Enabled = canRunChannelTests;
+            btnTestThrottle.Enabled = canRunChannelTests;
+            lblChannelVisual.Text = $"Path: {DescribeControlPath(activePath)}";
+        }
+
+        btnTelemetryStart.Enabled = fcConnected && !telemetryRunning;
+        btnTelemetryStop.Enabled = fcConnected && telemetryRunning;
+
+        var pidEnabled = fcConnected && !_channelTestRunning;
+        SetPidButtonsEnabled(pidEnabled);
     }
 
     private async Task RunChannelTestAsync(string control)
     {
         if (_channelTestRunning)
         {
+            return;
+        }
+        var activePath = GetActiveControlPath();
+        if (activePath == ControlPath.None)
+        {
+            MessageBox.Show(this, "Connect FC USB or Arduino before running channel tests.", "Channel test unavailable", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -255,7 +521,7 @@ public sealed partial class MainForm : Form
 
         try
         {
-            lblStatus.Text = $"Testing {control} on CH{channelNumber}...";
+            lblStatus.Text = $"Testing {control} on CH{channelNumber} via {DescribeControlPath(activePath)}...";
 
             if (settleMs > 0)
             {
@@ -302,12 +568,12 @@ public sealed partial class MainForm : Form
             }
 
             SetChannelTestVisual("Idle", control == "throttle" ? 1000 : 1500, 0.0, 0.0);
-            lblStatus.Text = $"Completed {control} channel test on CH{channelNumber}.";
+            lblStatus.Text = $"Completed {control} channel test on CH{channelNumber} via {DescribeControlPath(activePath)}.";
         }
         finally
         {
             _channelTestRunning = false;
-            SetChannelTestButtonsEnabled(true);
+            UpdateWorkflowUiState();
         }
     }
 
@@ -333,6 +599,7 @@ public sealed partial class MainForm : Form
             Interval = 250,
         };
         _telemetryTimer.Tick += (_, _) => PollTelemetrySample();
+        UpdateWorkflowUiState();
     }
 
     private void PollTelemetrySample()
@@ -345,7 +612,7 @@ public sealed partial class MainForm : Form
         try
         {
             var attitude = _serialPortService.ReadAttitude(1.0);
-            ApplyTelemetryVisual(attitude.RollDeg, attitude.PitchDeg, attitude.YawDeg, attitude.TimestampLocal);
+            ApplyTelemetryVisual(attitude.RollDeg, attitude.PitchDeg, attitude.YawDeg);
             lblRollAngle.Text = $"{attitude.RollDeg.ToString("F1", CultureInfo.InvariantCulture)} deg";
             lblPitchAngle.Text = $"{attitude.PitchDeg.ToString("F1", CultureInfo.InvariantCulture)} deg";
         }
@@ -355,12 +622,11 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void ApplyTelemetryVisual(double roll, double pitch, double yaw, DateTime updatedLocalTime)
+    private void ApplyTelemetryVisual(double roll, double pitch, double yaw)
     {
         lblTelemetryRoll.Text = $"{roll:F1} deg";
         lblTelemetryPitch.Text = $"{pitch:F1} deg";
         lblTelemetryYaw.Text = $"{yaw:F1} deg";
-        lblTelemetryUpdated.Text = updatedLocalTime.ToString("HH:mm:ss");
     }
 
     private void StartTelemetryLoop()
@@ -372,16 +638,14 @@ public sealed partial class MainForm : Form
         }
 
         _telemetryTimer?.Start();
-        btnTelemetryStart.Enabled = false;
-        btnTelemetryStop.Enabled = true;
+        UpdateWorkflowUiState();
         lblStatus.Text = "Live telemetry started.";
     }
 
     private void StopTelemetryLoop(string statusText = "Live telemetry stopped.")
     {
         _telemetryTimer?.Stop();
-        btnTelemetryStart.Enabled = true;
-        btnTelemetryStop.Enabled = false;
+        UpdateWorkflowUiState();
         lblStatus.Text = statusText;
     }
 
@@ -411,6 +675,7 @@ public sealed partial class MainForm : Form
         cmbManualPoints.Items.Clear();
         cmbManualPoints.Items.AddRange(new object[] { "1", "2", "3", "4", "5" });
         cmbManualPoints.SelectedIndex = 0;
+        UpdateWorkflowUiState();
     }
 
     private void InitializeDockWorkspace()

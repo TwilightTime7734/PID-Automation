@@ -1,8 +1,9 @@
+#nullable disable
 namespace DronePidTuningAssistant.WinForms;
 
 partial class MainForm
 {
-    private System.ComponentModel.IContainer? components = null;
+    private System.ComponentModel.IContainer components = null;
 
     protected override void Dispose(bool disposing)
     {
@@ -35,6 +36,7 @@ partial class MainForm
         lblArduinoBaudValue = new Label();
         btnArduinoConnect = new Button();
         btnArduinoDisconnect = new Button();
+        lblStatus = new Label();
         grpMapping = new GroupBox();
         mappingLayout = new TableLayoutPanel();
         lblRoll = new Label();
@@ -83,8 +85,6 @@ partial class MainForm
         lblTelemetryPitch = new Label();
         lblTelemetryYawTitle = new Label();
         lblTelemetryYaw = new Label();
-        lblTelemetryUpdatedTitle = new Label();
-        lblTelemetryUpdated = new Label();
         splitterTelemetry = new Splitter();
         grpPidWorkflow = new GroupBox();
         pidWorkflowLayout = new TableLayoutPanel();
@@ -116,7 +116,6 @@ partial class MainForm
         colScore = new ColumnHeader();
         colDecision = new ColumnHeader();
         pnlStatus = new Panel();
-        lblStatus = new Label();
         rootLayout.SuspendLayout();
         topLayout.SuspendLayout();
         grpUsb.SuspendLayout();
@@ -142,7 +141,6 @@ partial class MainForm
         pidButtonLayout.SuspendLayout();
         grpTuningProgress.SuspendLayout();
         tuningProgressLayout.SuspendLayout();
-        pnlStatus.SuspendLayout();
         SuspendLayout();
         // 
         // rootLayout
@@ -151,24 +149,22 @@ partial class MainForm
         rootLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         rootLayout.Controls.Add(topLayout, 0, 0);
         rootLayout.Controls.Add(grpPortingArea, 0, 1);
-        rootLayout.Controls.Add(pnlStatus, 0, 2);
         rootLayout.Dock = DockStyle.Fill;
         rootLayout.Location = new Point(0, 0);
         rootLayout.Name = "rootLayout";
         rootLayout.Padding = new Padding(10);
-        rootLayout.RowCount = 3;
+        rootLayout.RowCount = 2;
         rootLayout.RowStyles.Add(new RowStyle());
         rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        rootLayout.RowStyles.Add(new RowStyle());
-        rootLayout.Size = new Size(1389, 782);
+        rootLayout.Size = new Size(1389, 983);
         rootLayout.TabIndex = 0;
         // 
         // topLayout
         // 
         topLayout.AutoSize = true;
         topLayout.ColumnCount = 2;
-        topLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-        topLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        topLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 39.25165F));
+        topLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60.74835F));
         topLayout.Controls.Add(grpUsb, 0, 0);
         topLayout.Controls.Add(grpMapping, 1, 0);
         topLayout.Dock = DockStyle.Fill;
@@ -176,7 +172,7 @@ partial class MainForm
         topLayout.Name = "topLayout";
         topLayout.RowCount = 1;
         topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        topLayout.Size = new Size(1363, 129);
+        topLayout.Size = new Size(1363, 132);
         topLayout.TabIndex = 0;
         // 
         // grpUsb
@@ -187,7 +183,7 @@ partial class MainForm
         grpUsb.Location = new Point(3, 3);
         grpUsb.Name = "grpUsb";
         grpUsb.Padding = new Padding(10);
-        grpUsb.Size = new Size(675, 123);
+        grpUsb.Size = new Size(529, 126);
         grpUsb.TabIndex = 0;
         grpUsb.TabStop = false;
         grpUsb.Text = "Serial Ports";
@@ -216,13 +212,15 @@ partial class MainForm
         usbLayout.Controls.Add(lblArduinoBaudValue, 3, 1);
         usbLayout.Controls.Add(btnArduinoConnect, 5, 1);
         usbLayout.Controls.Add(btnArduinoDisconnect, 6, 1);
+        usbLayout.Controls.Add(lblStatus, 0, 2);
         usbLayout.Dock = DockStyle.Top;
         usbLayout.Location = new Point(10, 26);
         usbLayout.Name = "usbLayout";
-        usbLayout.RowCount = 2;
+        usbLayout.RowCount = 3;
         usbLayout.RowStyles.Add(new RowStyle());
         usbLayout.RowStyles.Add(new RowStyle());
-        usbLayout.Size = new Size(655, 68);
+        usbLayout.RowStyles.Add(new RowStyle());
+        usbLayout.Size = new Size(509, 90);
         usbLayout.TabIndex = 0;
         // 
         // lblPort
@@ -241,14 +239,14 @@ partial class MainForm
         cboPort.FormattingEnabled = true;
         cboPort.Location = new Point(59, 3);
         cboPort.Name = "cboPort";
-        cboPort.Size = new Size(110, 23);
+        cboPort.Size = new Size(81, 23);
         cboPort.TabIndex = 1;
         // 
         // lblBaud
         // 
         lblBaud.Anchor = AnchorStyles.Left;
         lblBaud.AutoSize = true;
-        lblBaud.Location = new Point(175, 9);
+        lblBaud.Location = new Point(146, 9);
         lblBaud.Name = "lblBaud";
         lblBaud.Size = new Size(34, 15);
         lblBaud.TabIndex = 2;
@@ -258,15 +256,15 @@ partial class MainForm
         // 
         lblBaudValue.Anchor = AnchorStyles.Left;
         lblBaudValue.AutoSize = true;
-        lblBaudValue.Location = new Point(215, 9);
+        lblBaudValue.Location = new Point(186, 9);
         lblBaudValue.Name = "lblBaudValue";
-        lblBaudValue.Size = new Size(42, 15);
+        lblBaudValue.Size = new Size(43, 15);
         lblBaudValue.TabIndex = 3;
         lblBaudValue.Text = "115200";
         // 
         // btnRefreshPorts
         // 
-        btnRefreshPorts.Location = new Point(316, 3);
+        btnRefreshPorts.Location = new Point(235, 3);
         btnRefreshPorts.Name = "btnRefreshPorts";
         btnRefreshPorts.Size = new Size(75, 28);
         btnRefreshPorts.TabIndex = 4;
@@ -276,21 +274,21 @@ partial class MainForm
         // 
         // btnConnect
         // 
-        btnConnect.Location = new Point(397, 3);
+        btnConnect.Location = new Point(316, 3);
         btnConnect.Name = "btnConnect";
         btnConnect.Size = new Size(75, 28);
         btnConnect.TabIndex = 5;
-        btnConnect.Text = "FC Connect";
+        btnConnect.Text = "Connect";
         btnConnect.UseVisualStyleBackColor = true;
         btnConnect.Click += btnConnect_Click;
         // 
         // btnDisconnect
         // 
-        btnDisconnect.Location = new Point(478, 3);
+        btnDisconnect.Location = new Point(397, 3);
         btnDisconnect.Name = "btnDisconnect";
         btnDisconnect.Size = new Size(75, 28);
         btnDisconnect.TabIndex = 6;
-        btnDisconnect.Text = "FC Disc";
+        btnDisconnect.Text = "Disconnect";
         btnDisconnect.UseVisualStyleBackColor = true;
         btnDisconnect.Click += btnDisconnect_Click;
         // 
@@ -310,14 +308,14 @@ partial class MainForm
         cboArduinoPort.FormattingEnabled = true;
         cboArduinoPort.Location = new Point(59, 37);
         cboArduinoPort.Name = "cboArduinoPort";
-        cboArduinoPort.Size = new Size(110, 23);
+        cboArduinoPort.Size = new Size(79, 23);
         cboArduinoPort.TabIndex = 8;
         // 
         // lblArduinoBaud
         // 
         lblArduinoBaud.Anchor = AnchorStyles.Left;
         lblArduinoBaud.AutoSize = true;
-        lblArduinoBaud.Location = new Point(175, 43);
+        lblArduinoBaud.Location = new Point(146, 43);
         lblArduinoBaud.Name = "lblArduinoBaud";
         lblArduinoBaud.Size = new Size(34, 15);
         lblArduinoBaud.TabIndex = 9;
@@ -327,41 +325,53 @@ partial class MainForm
         // 
         lblArduinoBaudValue.Anchor = AnchorStyles.Left;
         lblArduinoBaudValue.AutoSize = true;
-        lblArduinoBaudValue.Location = new Point(215, 43);
+        lblArduinoBaudValue.Location = new Point(186, 43);
         lblArduinoBaudValue.Name = "lblArduinoBaudValue";
-        lblArduinoBaudValue.Size = new Size(42, 15);
+        lblArduinoBaudValue.Size = new Size(43, 15);
         lblArduinoBaudValue.TabIndex = 10;
         lblArduinoBaudValue.Text = "115200";
         // 
         // btnArduinoConnect
         // 
-        btnArduinoConnect.Location = new Point(397, 37);
+        btnArduinoConnect.Location = new Point(316, 37);
         btnArduinoConnect.Name = "btnArduinoConnect";
         btnArduinoConnect.Size = new Size(75, 28);
         btnArduinoConnect.TabIndex = 11;
-        btnArduinoConnect.Text = "Ard Conn";
+        btnArduinoConnect.Text = "Connect";
         btnArduinoConnect.UseVisualStyleBackColor = true;
         btnArduinoConnect.Click += btnArduinoConnect_Click;
         // 
         // btnArduinoDisconnect
         // 
-        btnArduinoDisconnect.Location = new Point(478, 37);
+        btnArduinoDisconnect.Location = new Point(397, 37);
         btnArduinoDisconnect.Name = "btnArduinoDisconnect";
         btnArduinoDisconnect.Size = new Size(75, 28);
         btnArduinoDisconnect.TabIndex = 12;
-        btnArduinoDisconnect.Text = "Ard Disc";
+        btnArduinoDisconnect.Text = "Disconnect";
         btnArduinoDisconnect.UseVisualStyleBackColor = true;
         btnArduinoDisconnect.Click += btnArduinoDisconnect_Click;
+        // 
+        // lblStatus
+        // 
+        lblStatus.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        usbLayout.SetColumnSpan(lblStatus, 7);
+        lblStatus.Location = new Point(3, 71);
+        lblStatus.Margin = new Padding(3, 3, 3, 0);
+        lblStatus.Name = "lblStatus";
+        lblStatus.Size = new Size(649, 19);
+        lblStatus.TabIndex = 13;
+        lblStatus.Text = "Ready.";
+        lblStatus.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // grpMapping
         // 
         grpMapping.AutoSize = true;
         grpMapping.Controls.Add(mappingLayout);
         grpMapping.Dock = DockStyle.Fill;
-        grpMapping.Location = new Point(684, 3);
+        grpMapping.Location = new Point(538, 3);
         grpMapping.Name = "grpMapping";
         grpMapping.Padding = new Padding(10);
-        grpMapping.Size = new Size(676, 123);
+        grpMapping.Size = new Size(822, 126);
         grpMapping.TabIndex = 1;
         grpMapping.TabStop = false;
         grpMapping.Text = "Transmitter PPM Channel Mapping";
@@ -387,7 +397,7 @@ partial class MainForm
         mappingLayout.RowStyles.Add(new RowStyle());
         mappingLayout.RowStyles.Add(new RowStyle());
         mappingLayout.RowStyles.Add(new RowStyle());
-        mappingLayout.Size = new Size(656, 87);
+        mappingLayout.Size = new Size(802, 87);
         mappingLayout.TabIndex = 0;
         // 
         // lblRoll
@@ -468,10 +478,10 @@ partial class MainForm
         grpPortingArea.Controls.Add(splitterPid);
         grpPortingArea.Controls.Add(grpTuningProgress);
         grpPortingArea.Dock = DockStyle.Fill;
-        grpPortingArea.Location = new Point(13, 148);
+        grpPortingArea.Location = new Point(13, 151);
         grpPortingArea.Name = "grpPortingArea";
         grpPortingArea.Padding = new Padding(10);
-        grpPortingArea.Size = new Size(1363, 591);
+        grpPortingArea.Size = new Size(1363, 819);
         grpPortingArea.TabIndex = 1;
         grpPortingArea.TabStop = false;
         grpPortingArea.Text = "Porting Area";
@@ -853,9 +863,7 @@ partial class MainForm
         // telemetryValueLayout
         // 
         telemetryValueLayout.AutoSize = true;
-        telemetryValueLayout.ColumnCount = 8;
-        telemetryValueLayout.ColumnStyles.Add(new ColumnStyle());
-        telemetryValueLayout.ColumnStyles.Add(new ColumnStyle());
+        telemetryValueLayout.ColumnCount = 6;
         telemetryValueLayout.ColumnStyles.Add(new ColumnStyle());
         telemetryValueLayout.ColumnStyles.Add(new ColumnStyle());
         telemetryValueLayout.ColumnStyles.Add(new ColumnStyle());
@@ -868,8 +876,6 @@ partial class MainForm
         telemetryValueLayout.Controls.Add(lblTelemetryPitch, 3, 0);
         telemetryValueLayout.Controls.Add(lblTelemetryYawTitle, 4, 0);
         telemetryValueLayout.Controls.Add(lblTelemetryYaw, 5, 0);
-        telemetryValueLayout.Controls.Add(lblTelemetryUpdatedTitle, 6, 0);
-        telemetryValueLayout.Controls.Add(lblTelemetryUpdated, 7, 0);
         telemetryValueLayout.Dock = DockStyle.Fill;
         telemetryValueLayout.Location = new Point(3, 44);
         telemetryValueLayout.Name = "telemetryValueLayout";
@@ -937,26 +943,6 @@ partial class MainForm
         lblTelemetryYaw.Size = new Size(48, 15);
         lblTelemetryYaw.TabIndex = 5;
         lblTelemetryYaw.Text = "--.- deg";
-        // 
-        // lblTelemetryUpdatedTitle
-        // 
-        lblTelemetryUpdatedTitle.Anchor = AnchorStyles.Left;
-        lblTelemetryUpdatedTitle.AutoSize = true;
-        lblTelemetryUpdatedTitle.Location = new Point(281, 21);
-        lblTelemetryUpdatedTitle.Name = "lblTelemetryUpdatedTitle";
-        lblTelemetryUpdatedTitle.Size = new Size(79, 15);
-        lblTelemetryUpdatedTitle.TabIndex = 6;
-        lblTelemetryUpdatedTitle.Text = "Last Updated:";
-        // 
-        // lblTelemetryUpdated
-        // 
-        lblTelemetryUpdated.Anchor = AnchorStyles.Left;
-        lblTelemetryUpdated.AutoSize = true;
-        lblTelemetryUpdated.Location = new Point(366, 21);
-        lblTelemetryUpdated.Name = "lblTelemetryUpdated";
-        lblTelemetryUpdated.Size = new Size(38, 15);
-        lblTelemetryUpdated.TabIndex = 7;
-        lblTelemetryUpdated.Text = "Never";
         // 
         // splitterTelemetry
         // 
@@ -1214,7 +1200,7 @@ partial class MainForm
         grpTuningProgress.Location = new Point(10, 26);
         grpTuningProgress.Name = "grpTuningProgress";
         grpTuningProgress.Padding = new Padding(10);
-        grpTuningProgress.Size = new Size(1343, 555);
+        grpTuningProgress.Size = new Size(1343, 783);
         grpTuningProgress.TabIndex = 3;
         grpTuningProgress.TabStop = false;
         grpTuningProgress.Text = "Tuning Progression Charts and Recommendations";
@@ -1231,7 +1217,7 @@ partial class MainForm
         tuningProgressLayout.Name = "tuningProgressLayout";
         tuningProgressLayout.RowCount = 1;
         tuningProgressLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        tuningProgressLayout.Size = new Size(1323, 519);
+        tuningProgressLayout.Size = new Size(1323, 747);
         tuningProgressLayout.TabIndex = 0;
         // 
         // pnlScoreChart
@@ -1241,7 +1227,7 @@ partial class MainForm
         pnlScoreChart.Dock = DockStyle.Fill;
         pnlScoreChart.Location = new Point(3, 3);
         pnlScoreChart.Name = "pnlScoreChart";
-        pnlScoreChart.Size = new Size(655, 513);
+        pnlScoreChart.Size = new Size(655, 741);
         pnlScoreChart.TabIndex = 0;
         pnlScoreChart.Paint += pnlScoreChart_Paint;
         // 
@@ -1252,7 +1238,7 @@ partial class MainForm
         lvTuningRuns.FullRowSelect = true;
         lvTuningRuns.Location = new Point(664, 3);
         lvTuningRuns.Name = "lvTuningRuns";
-        lvTuningRuns.Size = new Size(656, 513);
+        lvTuningRuns.Size = new Size(656, 741);
         lvTuningRuns.TabIndex = 1;
         lvTuningRuns.UseCompatibleStateImageBehavior = false;
         lvTuningRuns.View = View.Details;
@@ -1279,28 +1265,16 @@ partial class MainForm
         // 
         // pnlStatus
         // 
-        pnlStatus.Controls.Add(lblStatus);
-        pnlStatus.Dock = DockStyle.Fill;
-        pnlStatus.Location = new Point(13, 745);
+        pnlStatus.Location = new Point(0, 0);
         pnlStatus.Name = "pnlStatus";
-        pnlStatus.Size = new Size(1363, 24);
-        pnlStatus.TabIndex = 2;
-        // 
-        // lblStatus
-        // 
-        lblStatus.Dock = DockStyle.Fill;
-        lblStatus.Location = new Point(0, 0);
-        lblStatus.Name = "lblStatus";
-        lblStatus.Size = new Size(1363, 24);
-        lblStatus.TabIndex = 0;
-        lblStatus.Text = "Ready.";
-        lblStatus.TextAlign = ContentAlignment.MiddleLeft;
+        pnlStatus.Size = new Size(200, 100);
+        pnlStatus.TabIndex = 0;
         // 
         // MainForm
         // 
         AutoScaleDimensions = new SizeF(7F, 15F);
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(1389, 782);
+        ClientSize = new Size(1389, 983);
         Controls.Add(rootLayout);
         MinimumSize = new Size(900, 560);
         Name = "MainForm";
@@ -1343,7 +1317,6 @@ partial class MainForm
         pidButtonLayout.ResumeLayout(false);
         grpTuningProgress.ResumeLayout(false);
         tuningProgressLayout.ResumeLayout(false);
-        pnlStatus.ResumeLayout(false);
         ResumeLayout(false);
     }
 
@@ -1419,8 +1392,6 @@ partial class MainForm
     private Label lblTelemetryPitch;
     private Label lblTelemetryYawTitle;
     private Label lblTelemetryYaw;
-    private Label lblTelemetryUpdatedTitle;
-    private Label lblTelemetryUpdated;
     private TableLayoutPanel channelTestLayout;
     private FlowLayoutPanel channelActionLayout;
     private Button btnTestRoll;
