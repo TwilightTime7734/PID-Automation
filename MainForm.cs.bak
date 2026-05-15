@@ -1,0 +1,334 @@
+using System.ComponentModel;
+using DronePidTuningAssistant.WinForms.Models;
+using DronePidTuningAssistant.WinForms.Services;
+
+namespace DronePidTuningAssistant.WinForms;
+
+public sealed partial class MainForm : Form
+{
+    private readonly LayoutSettingsService _settingsService = new();
+    private readonly SerialPortService _serialPortService = new();
+    private readonly ComboBox _portCombo = new();
+    private readonly ComboBox _baudCombo = new();
+    private readonly ComboBox _rollCombo = new();
+    private readonly ComboBox _pitchCombo = new();
+    private readonly ComboBox _throttleCombo = new();
+    private readonly Label _statusLabel = new();
+
+    public MainForm()
+    {
+        InitializeComponent();
+
+        if (IsInDesignMode())
+        {
+            return;
+        }
+
+        LoadSerialDefaults();
+        RefreshPortList();
+        LoadChannelMapping();
+    }
+
+    private Control BuildTopSection()
+    {
+        var top = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            ColumnCount = 2,
+        };
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        top.Controls.Add(BuildUsbSection(), 0, 0);
+        top.Controls.Add(BuildMappingSection(), 1, 0);
+        return top;
+    }
+
+    private Control BuildUsbSection()
+    {
+        var usb = new GroupBox
+        {
+            Text = "FC USB Serial Port",
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(10),
+            Margin = new Padding(0, 0, 12, 0),
+        };
+
+        var grid = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            ColumnCount = 6,
+            RowCount = 2,
+            AutoSize = true,
+        };
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        _portCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _portCombo.Width = 100;
+        _portCombo.Margin = new Padding(6, 3, 6, 3);
+
+        _baudCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _baudCombo.Width = 90;
+        _baudCombo.Margin = new Padding(6, 3, 6, 3);
+        foreach (var baud in new[] { 115200, 57600, 38400, 19200, 9600 })
+        {
+            _baudCombo.Items.Add(baud);
+        }
+
+        var refreshButton = new Button { Text = "Refresh", Width = 75, Height = 28 };
+        refreshButton.Click += (_, _) => RefreshPortList();
+
+        var connectButton = new Button { Text = "Connect", Width = 75, Height = 28 };
+        connectButton.Click += (_, _) => ConnectUsb();
+
+        var disconnectButton = new Button { Text = "Disconnect", Width = 85, Height = 28 };
+        disconnectButton.Click += (_, _) => DisconnectUsb();
+
+        grid.Controls.Add(new Label { Text = "FC USB", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
+        grid.Controls.Add(_portCombo, 1, 0);
+        grid.Controls.Add(new Label { Text = "Baud", AutoSize = true, Anchor = AnchorStyles.Left }, 2, 0);
+        grid.Controls.Add(_baudCombo, 3, 0);
+        grid.Controls.Add(refreshButton, 4, 0);
+        grid.Controls.Add(connectButton, 5, 0);
+        grid.Controls.Add(disconnectButton, 5, 1);
+
+        usb.Controls.Add(grid);
+        return usb;
+    }
+
+    private Control BuildMappingSection()
+    {
+        var mapping = new GroupBox
+        {
+            Text = "Transmitter PPM Channel Mapping",
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(10),
+        };
+
+        var grid = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            ColumnCount = 3,
+            RowCount = 3,
+            AutoSize = true,
+        };
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        ConfigureChannelCombo(_rollCombo);
+        ConfigureChannelCombo(_pitchCombo);
+        ConfigureChannelCombo(_throttleCombo);
+
+        grid.Controls.Add(new Label { Text = "Roll", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
+        grid.Controls.Add(_rollCombo, 1, 0);
+        grid.Controls.Add(new Label { Text = "Pitch", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
+        grid.Controls.Add(_pitchCombo, 1, 1);
+        grid.Controls.Add(new Label { Text = "Throttle", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 2);
+        grid.Controls.Add(_throttleCombo, 1, 2);
+
+        var applyButton = new Button
+        {
+            Text = "Apply",
+            Width = 75,
+            Height = 28,
+            Anchor = AnchorStyles.Top,
+        };
+        applyButton.Click += (_, _) => SaveChannelMapping();
+        grid.Controls.Add(applyButton, 2, 0);
+        grid.SetRowSpan(applyButton, 3);
+
+        mapping.Controls.Add(grid);
+        return mapping;
+    }
+
+    private Control BuildPlaceholderSection()
+    {
+        var panel = new GroupBox
+        {
+            Text = "Porting Area",
+            Dock = DockStyle.Fill,
+            Padding = new Padding(10),
+        };
+
+        var info = new Label
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = false,
+            TextAlign = ContentAlignment.TopLeft,
+            Text =
+                "This is a clean WinForms port scaffold.\r\n\r\n" +
+                "Next we can migrate modules from Python in small slices:\r\n" +
+                "1. Serial/USB connect controls\r\n" +
+                "2. Channel test actions\r\n" +
+                "3. Live telemetry display\r\n" +
+                "4. PID tuning workflow and charts",
+        };
+        panel.Controls.Add(info);
+        return panel;
+    }
+
+    private Control BuildStatusSection()
+    {
+        var panel = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 30,
+        };
+        _statusLabel.Text = "Ready.";
+        _statusLabel.Dock = DockStyle.Fill;
+        _statusLabel.TextAlign = ContentAlignment.MiddleLeft;
+        panel.Controls.Add(_statusLabel);
+        return panel;
+    }
+
+    private static void ConfigureChannelCombo(ComboBox combo)
+    {
+        combo.DropDownStyle = ComboBoxStyle.DropDownList;
+        combo.Width = 60;
+        combo.Margin = new Padding(6, 3, 6, 3);
+        for (var i = 1; i <= 8; i++)
+        {
+            combo.Items.Add(i);
+        }
+    }
+
+    private void LoadChannelMapping()
+    {
+        var mapping = _settingsService.LoadMapping();
+        SetComboValue(_rollCombo, mapping.Roll);
+        SetComboValue(_pitchCombo, mapping.Pitch);
+        SetComboValue(_throttleCombo, mapping.Throttle);
+        _statusLabel.Text = "Loaded channel mapping.";
+    }
+
+    private void SaveChannelMapping()
+    {
+        var mapping = new ChannelMapping
+        {
+            Roll = GetComboValue(_rollCombo, 1),
+            Pitch = GetComboValue(_pitchCombo, 2),
+            Throttle = GetComboValue(_throttleCombo, 3),
+        };
+        _settingsService.SaveMapping(mapping);
+        _statusLabel.Text = $"Saved mapping: Roll CH{mapping.Roll}, Pitch CH{mapping.Pitch}, Throttle CH{mapping.Throttle}";
+    }
+
+    private static int GetComboValue(ComboBox combo, int fallback)
+    {
+        return combo.SelectedItem is int value ? value : fallback;
+    }
+
+    private static void SetComboValue(ComboBox combo, int value)
+    {
+        if (combo.Items.Contains(value))
+        {
+            combo.SelectedItem = value;
+        }
+        else if (combo.Items.Count > 0)
+        {
+            combo.SelectedIndex = 0;
+        }
+    }
+
+    private void LoadSerialDefaults()
+    {
+        if (_baudCombo.Items.Count > 0)
+        {
+            _baudCombo.SelectedItem = 115200;
+        }
+    }
+
+    private void RefreshPortList()
+    {
+        var ports = _serialPortService.GetAvailablePorts();
+        var previousSelection = _portCombo.SelectedItem as string;
+
+        _portCombo.Items.Clear();
+        foreach (var port in ports)
+        {
+            _portCombo.Items.Add(port);
+        }
+
+        if (previousSelection is not null && _portCombo.Items.Contains(previousSelection))
+        {
+            _portCombo.SelectedItem = previousSelection;
+        }
+        else if (_portCombo.Items.Count > 0)
+        {
+            _portCombo.SelectedIndex = 0;
+        }
+
+        _statusLabel.Text = ports.Count == 0
+            ? "No serial ports detected."
+            : $"Detected {ports.Count} serial port(s).";
+    }
+
+    private void ConnectUsb()
+    {
+        if (_portCombo.SelectedItem is not string portName || string.IsNullOrWhiteSpace(portName))
+        {
+            MessageBox.Show(this, "Select an FC USB serial port first.", "Missing port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        if (_baudCombo.SelectedItem is not int baudRate)
+        {
+            MessageBox.Show(this, "Select a baud rate first.", "Missing baud", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        try
+        {
+            _serialPortService.Connect(portName, baudRate);
+            _statusLabel.Text = $"Connected FC USB: {portName}@{baudRate}";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Connection failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            _statusLabel.Text = "FC USB connection failed.";
+        }
+    }
+
+    private void DisconnectUsb()
+    {
+        _serialPortService.Disconnect();
+        _statusLabel.Text = "FC USB disconnected.";
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        _serialPortService.Dispose();
+        base.OnFormClosed(e);
+    }
+
+    private static bool IsInDesignMode()
+    {
+        return LicenseManager.UsageMode == LicenseUsageMode.Designtime;
+    }
+
+    private void BuildMainLayout()
+    {
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Padding = new Padding(10),
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        Controls.Add(root);
+
+        root.Controls.Add(BuildTopSection(), 0, 0);
+        root.Controls.Add(BuildPlaceholderSection(), 0, 1);
+        root.Controls.Add(BuildStatusSection(), 0, 2);
+    }
+}
