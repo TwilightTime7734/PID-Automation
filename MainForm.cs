@@ -55,6 +55,8 @@ public sealed partial class MainForm : Form
         ConfigureChannelCombo(cboRoll);
         ConfigureChannelCombo(cboPitch);
         ConfigureChannelCombo(cboThrottle);
+        ApplyResponsiveLayoutRules(this);
+        ConfigureSerialPortsResponsiveLayout();
         Shown += async (_, _) => await DiscoverPortsOnStartupAsync();
         cboPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
         cboArduinoPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
@@ -64,7 +66,81 @@ public sealed partial class MainForm : Form
         InitializeTelemetry();
         InitializePidWorkflow();
         UpdateSerialConnectionUi();
-        InitializeDockWorkspace();
+        // InitializeDockWorkspace disabled to keep the runtime UI identical to the Designer layout.
+        // InitializeDockWorkspace();
+    }
+
+    private static void ApplyResponsiveLayoutRules(Control root)
+    {
+        if (root is TableLayoutPanel table)
+        {
+            table.AutoSize = false;
+
+            var allColumnsAuto = table.ColumnStyles.Count > 0 && table.ColumnStyles.Cast<ColumnStyle>().All(c => c.SizeType == SizeType.AutoSize);
+            if (allColumnsAuto)
+            {
+                var last = table.ColumnStyles.Count - 1;
+                table.ColumnStyles[last].SizeType = SizeType.Percent;
+                table.ColumnStyles[last].Width = 100f;
+            }
+
+            var allRowsAuto = table.RowStyles.Count > 0 && table.RowStyles.Cast<RowStyle>().All(r => r.SizeType == SizeType.AutoSize);
+            if (allRowsAuto)
+            {
+                var last = table.RowStyles.Count - 1;
+                table.RowStyles[last].SizeType = SizeType.Percent;
+                table.RowStyles[last].Height = 100f;
+            }
+        }
+
+        switch (root)
+        {
+            case ComboBox:
+            case TextBox:
+            case NumericUpDown:
+                root.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+                break;
+            case ListView:
+            case Panel:
+                root.Dock = DockStyle.Fill;
+                break;
+        }
+
+        foreach (Control child in root.Controls)
+        {
+            ApplyResponsiveLayoutRules(child);
+        }
+    }
+
+    private void ConfigureSerialPortsResponsiveLayout()
+    {
+        usbLayout.SuspendLayout();
+        try
+        {
+            usbLayout.AutoSize = false;
+            usbLayout.Dock = DockStyle.Fill;
+            usbLayout.ColumnStyles.Clear();
+            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 10f)); // FC/Arduino label
+            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 24f)); // Port combo
+            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 8f));  // Baud label
+            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 10f)); // Baud value
+            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16f)); // Refresh
+            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16f)); // Connect
+            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16f)); // Disconnect
+
+            cboPort.Dock = DockStyle.Fill;
+            cboArduinoPort.Dock = DockStyle.Fill;
+            btnRefreshPorts.Dock = DockStyle.Fill;
+            btnConnect.Dock = DockStyle.Fill;
+            btnDisconnect.Dock = DockStyle.Fill;
+            btnArduinoConnect.Dock = DockStyle.Fill;
+            btnArduinoDisconnect.Dock = DockStyle.Fill;
+            lblStatus.Dock = DockStyle.Fill;
+        }
+        finally
+        {
+            usbLayout.ResumeLayout();
+        }
     }
 
     private async Task DiscoverPortsOnStartupAsync()
@@ -697,12 +773,19 @@ public sealed partial class MainForm : Form
         grpPortingArea.Controls.Clear();
         grpPortingArea.Controls.Add(_dockWorkspace);
 
-        var serialContent = new DockSectionContent("Serial Ports", PersistKeySerialPorts, grpUsb);
-        var mappingContent = new DockSectionContent("Transmitter PPM Channel Mapping", PersistKeyPpmMapping, grpMapping);
-        var telemetryContent = new DockSectionContent("Telemetry", PersistKeyTelemetry, grpTelemetry);
-        var channelContent = new DockSectionContent("Channel Test", PersistKeyChannelTest, grpChannelTest);
-        var pidContent = new DockSectionContent("PID Tuning Workflow", PersistKeyPidWorkflow, grpPidWorkflow);
-        var progressContent = new DockSectionContent("Tuning Progression", PersistKeyTuningProgress, grpTuningProgress);
+        PrepareSectionForDocking(grpUsb);
+        PrepareSectionForDocking(grpMapping);
+        PrepareSectionForDocking(grpTelemetry);
+        PrepareSectionForDocking(grpChannelTest);
+        PrepareSectionForDocking(grpPidWorkflow);
+        PrepareSectionForDocking(grpTuningProgress);
+
+        var serialContent = new DockSectionContent(grpUsb.Text, PersistKeySerialPorts, grpUsb);
+        var mappingContent = new DockSectionContent(grpMapping.Text, PersistKeyPpmMapping, grpMapping);
+        var telemetryContent = new DockSectionContent(grpTelemetry.Text, PersistKeyTelemetry, grpTelemetry);
+        var channelContent = new DockSectionContent(grpChannelTest.Text, PersistKeyChannelTest, grpChannelTest);
+        var pidContent = new DockSectionContent(grpPidWorkflow.Text, PersistKeyPidWorkflow, grpPidWorkflow);
+        var progressContent = new DockSectionContent(grpTuningProgress.Text, PersistKeyTuningProgress, grpTuningProgress);
 
         _dockSections.Clear();
         _dockSections[PersistKeySerialPorts] = serialContent;
@@ -712,13 +795,35 @@ public sealed partial class MainForm : Form
         _dockSections[PersistKeyPidWorkflow] = pidContent;
         _dockSections[PersistKeyTuningProgress] = progressContent;
 
-        if (!TryRestoreDockLayout())
+        // Ensure any previously saved dock layout is removed so designer layout is used.
+        TryDeleteDockLayoutFile();
+        ApplyDefaultDockLayout();
+        EnsureDockSectionsVisible();
+    }
+
+    private static void PrepareSectionForDocking(Control root)
+    {
+        if (root is GroupBox groupBox)
         {
-            ApplyDefaultDockLayout();
+            groupBox.AutoSize = false;
+            groupBox.AutoSizeMode = AutoSizeMode.GrowOnly;
+            groupBox.Dock = DockStyle.Fill;
         }
-        else
+
+        if (root is ScrollableControl scrollable)
         {
-            EnsureDockSectionsVisible();
+            scrollable.AutoScroll = true;
+        }
+
+        foreach (Control child in root.Controls)
+        {
+            if (child is TableLayoutPanel table)
+            {
+                table.AutoSize = false;
+                table.Dock = DockStyle.Fill;
+            }
+
+            PrepareSectionForDocking(child);
         }
     }
 
@@ -767,7 +872,7 @@ public sealed partial class MainForm : Form
         {
             serialContent.Show(_dockWorkspace, DockState.DockTop);
             mappingContent.Show(_dockWorkspace, DockState.DockTop);
-            telemetryContent.Show(_dockWorkspace, DockState.DockLeft);
+            telemetryContent.Show(_dockWorkspace, DockState.DockTop);
             channelContent.Show(_dockWorkspace, DockState.Document);
             pidContent.Show(_dockWorkspace, DockState.DockRight);
             progressContent.Show(_dockWorkspace, DockState.DockBottom);
@@ -781,28 +886,8 @@ public sealed partial class MainForm : Form
 
     private bool TryRestoreDockLayout()
     {
-        if (_dockWorkspace is null)
-        {
-            return false;
-        }
-        EnsureDockTheme();
-
-        var path = GetDockLayoutPath();
-        if (!File.Exists(path))
-        {
-            return false;
-        }
-
-        try
-        {
-            _dockWorkspace.LoadFromXml(path, DeserializeDockContent);
-            return HasVisibleDockContent();
-        }
-        catch
-        {
-            TryDeleteDockLayoutFile();
-            return false;
-        }
+        // Restoring persisted dock layouts disabled to keep runtime UI consistent with the Designer.
+        return false;
     }
 
     private void RecoverDockWorkspace()
@@ -838,7 +923,7 @@ public sealed partial class MainForm : Form
 
             serialContent.Show(_dockWorkspace, DockState.DockTop);
             mappingContent.Show(_dockWorkspace, DockState.DockTop);
-            telemetryContent.Show(_dockWorkspace, DockState.DockLeft);
+            telemetryContent.Show(_dockWorkspace, DockState.DockTop);
             channelContent.Show(_dockWorkspace, DockState.Document);
             pidContent.Show(_dockWorkspace, DockState.DockRight);
             progressContent.Show(_dockWorkspace, DockState.DockBottom);
@@ -924,14 +1009,7 @@ public sealed partial class MainForm : Form
 
     private void SaveDockLayout()
     {
-        if (_dockWorkspace is null)
-        {
-            return;
-        }
-
-        var path = GetDockLayoutPath();
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        _dockWorkspace.SaveAsXml(path);
+        // Persisting layout disabled to avoid runtime layout drift.
     }
 
     private static string GetDockLayoutPath()
@@ -1293,18 +1371,12 @@ public sealed partial class MainForm : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        try
-        {
-            SaveDockLayout();
-        }
-        catch
-        {
-            // Best-effort persistence; do not block form close.
-        }
         _telemetryTimer?.Stop();
         _telemetryTimer?.Dispose();
         _arduinoConnected = false;
         _serialPortService.Dispose();
+
+        // Do not persist layout on exit; always use designer layout on next startup.
         base.OnFormClosed(e);
     }
 
