@@ -3,43 +3,54 @@ Thread state snapshot
 - updated: 2026-05-16
 - workspace: D:\VisualStudioCommunity\DronePidTuningAssistant.WinForms
 - branch: main (local)
-- primary files: MainForm.cs, MainForm.Designer.cs
+- primary files: MainForm.cs, MainForm.Designer.cs, Services/SerialPortService.cs, Services/ArduinoTrainerCableClient.cs
 
 Current project state:
-- DockPanelSuite/docking framework has been removed from the WinForms project.
-- Main layout is currently Designer-driven (runtime layout helper methods were removed from MainForm.cs).
-- Serial Ports section now uses:
-  - FC row controls: cboPort, cboBaud, btnFcConnect, btnFcDisconnect
-  - Arduino row controls: cboArduinoPort, cboArduinoBaud, btnArduinoConnect, btnArduinoDisconnect
-  - Refresh control: btnRefreshPorts
-- Duplicate old right-side serial buttons were removed.
-- Channel mapping combos are renamed and present in designer:
-  - cboCH1, cboCH2, cboCH3, cboCH4
-- Static combo items moved into designer for:
-  - cboBaud / cboArduinoBaud (9600, 115200; default 115200)
-  - cboCH1..cboCH4 (1..8)
-- Dynamic serial port list population remains in MainForm.cs (PopulatePortCombos / RefreshPortList).
+- DockPanelSuite/docking framework removed.
+- Form layout is currently panel-based in Designer (TableLayoutPanel/FlowLayoutPanel were converted to Panel).
+- Serial Ports section has FC and Arduino rows plus status labels:
+  - FC: cboPort, cboBaud, btnFcConnect, btnFcDisconnect
+  - Arduino: cboArduinoPort, cboArduinoBaud, btnArduinoConnect, btnArduinoDisconnect
+  - Status labels: lblFCStatus (FC), lblArduinoStatus (Arduino)
+- Added Trainer pin UI in Serial Ports:
+  - lblTrainerPin + cboTrainerPin
+  - cboTrainerPin items: 3, 5, 6, 9, 10, 11
+  - selected pin is used on Arduino connect/reconnect and can be changed live while connected.
 
-User directive for future designer edits:
+Porting status (Python -> WinForms):
+- FC MSP path: implemented in SerialPortService.cs
+  - attitude read, setting get/set, save settings.
+- Arduino trainer-cable Telemetrix path: implemented in ArduinoTrainerCableClient.cs
+  - command 62: begin
+  - command 63: end
+  - command 64: set single channel pulse
+  - command 65: set all 8 channel pulses
+  - command 66: center
+  - command 67: status
+  - command 68: set output pin
+  - status parser includes legacy 76-byte payload hint.
+- MainForm integration:
+  - ConnectArduinoUsb: open serial, set selected trainer pin, begin, center controls.
+  - DisconnectArduinoUsb: end and close Arduino transport.
+  - OnArduinoBaudChanged: reconnect + set selected pin + begin + center.
+  - OnTrainerPinChanged: live pin switch while connected.
+- Channel test path:
+  - RunChannelTestAsync sends actual Arduino trainer pulses via channel mapping (A/E/T/R -> CH1..CH4 combo mapping).
+  - centers controls at the end.
+- PID workflow:
+  - if Arduino connected, uses dynamic scoring path with baseline angular-rate sampling + positive/negative direction capture + angle-target neutralization.
+  - if Arduino not connected, uses legacy noise-only scoring fallback.
+
+User directives to preserve:
 - User controls layout manually.
-- When modifying MainForm.Designer.cs, keep layout properties constrained to:
-  - Dock = None
-  - Anchor = Top, Left
-  - AutoSize = false
-- Do not make broad layout refactors unless explicitly requested.
+- Use CRLF line endings only.
+- Before editing designer files, ask user to close Designer tabs.
 
-Line ending policy:
-- User expects CRLF-only edits.
-- Apply CRLF normalization after file edits.
-
-If context changes next thread should read:
-- MainForm.Designer.cs (authoritative form layout + control declarations)
-- MainForm.cs (serial/telemetry/PID behavior and button enable-state logic)
-- DronePidTuningAssistant.WinForms.csproj (package/dependency state)
-
-Backups created during this thread:
+Backups present:
 - MainForm.cs.pre-rename.bak
 - MainForm.Designer.cs.pre-rename.bak
+- MainForm.Designer.cs.bak-before-panel-convert
+- MainForm.Designer.cs.bak-before-flow-to-panel
 
 Last known successful compile:
-- dotnet build -t:Compile (success, 0 errors)
+- dotnet build -c Debug (success, 0 errors)
