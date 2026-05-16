@@ -5,8 +5,6 @@ using System.IO.Ports;
 using System.Management;
 using DronePidTuningAssistant.WinForms.Models;
 using DronePidTuningAssistant.WinForms.Services;
-using WeifenLuo.WinFormsUI.Docking;
-using WeifenLuo.WinFormsUI.ThemeVS2015;
 
 namespace DronePidTuningAssistant.WinForms;
 
@@ -19,24 +17,15 @@ public sealed partial class MainForm : Form
         ArduinoTransmitter = 2,
     }
 
-    private const int FixedSerialBaud = 115200;
-    private const string PersistKeyTelemetry = "panel.telemetry";
-    private const string PersistKeyChannelTest = "panel.channel_test";
-    private const string PersistKeyPidWorkflow = "panel.pid_workflow";
-    private const string PersistKeyTuningProgress = "panel.tuning_progress";
-    private const string PersistKeySerialPorts = "panel.serial_ports";
-    private const string PersistKeyPpmMapping = "panel.ppm_mapping";
-
+    private const int DefaultSerialBaud = 115200;
+    private int _fcBaudRate = DefaultSerialBaud;
+    private int _arduinoBaudRate = DefaultSerialBaud;
     private readonly LayoutSettingsService _settingsService = new();
     private readonly SerialPortService _serialPortService = new();
     private readonly List<TuningRunRecord> _tuningRuns = new();
-    private readonly Dictionary<string, DockSectionContent> _dockSections = new(StringComparer.Ordinal);
     private bool _channelTestRunning;
     private bool _arduinoConnected;
     private System.Windows.Forms.Timer? _telemetryTimer;
-    private DockPanel? _dockWorkspace;
-    private bool _dockWorkspaceInitialized;
-    private bool _dockRecoveryAttempted;
     private bool _startupScanInProgress;
     private string? _activeAxis;
     private int _rollIteration;
@@ -52,95 +41,21 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        ConfigureChannelCombo(cboRoll);
-        ConfigureChannelCombo(cboPitch);
-        ConfigureChannelCombo(cboThrottle);
-        ApplyResponsiveLayoutRules(this);
-        ConfigureSerialPortsResponsiveLayout();
+        ConfigureChannelCombo(cboCH1);
+        ConfigureChannelCombo(cboCH2);
+        ConfigureChannelCombo(cboCH3);
+        ConfigureChannelCombo(cboCH4);
+        InitializeBaudSelectors();
         Shown += async (_, _) => await DiscoverPortsOnStartupAsync();
         cboPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
         cboArduinoPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
-        LoadSerialDefaults();
+        cboBaud.SelectedIndexChanged += (_, _) => OnFcBaudChanged();
+        cboArduinoBaud.SelectedIndexChanged += (_, _) => OnArduinoBaudChanged();
         RefreshPortList();
         LoadChannelMapping();
         InitializeTelemetry();
         InitializePidWorkflow();
         UpdateSerialConnectionUi();
-        // InitializeDockWorkspace disabled to keep the runtime UI identical to the Designer layout.
-        // InitializeDockWorkspace();
-    }
-
-    private static void ApplyResponsiveLayoutRules(Control root)
-    {
-        if (root is TableLayoutPanel table)
-        {
-            table.AutoSize = false;
-
-            var allColumnsAuto = table.ColumnStyles.Count > 0 && table.ColumnStyles.Cast<ColumnStyle>().All(c => c.SizeType == SizeType.AutoSize);
-            if (allColumnsAuto)
-            {
-                var last = table.ColumnStyles.Count - 1;
-                table.ColumnStyles[last].SizeType = SizeType.Percent;
-                table.ColumnStyles[last].Width = 100f;
-            }
-
-            var allRowsAuto = table.RowStyles.Count > 0 && table.RowStyles.Cast<RowStyle>().All(r => r.SizeType == SizeType.AutoSize);
-            if (allRowsAuto)
-            {
-                var last = table.RowStyles.Count - 1;
-                table.RowStyles[last].SizeType = SizeType.Percent;
-                table.RowStyles[last].Height = 100f;
-            }
-        }
-
-        switch (root)
-        {
-            case ComboBox:
-            case TextBox:
-            case NumericUpDown:
-                root.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-                break;
-            case ListView:
-            case Panel:
-                root.Dock = DockStyle.Fill;
-                break;
-        }
-
-        foreach (Control child in root.Controls)
-        {
-            ApplyResponsiveLayoutRules(child);
-        }
-    }
-
-    private void ConfigureSerialPortsResponsiveLayout()
-    {
-        usbLayout.SuspendLayout();
-        try
-        {
-            usbLayout.AutoSize = false;
-            usbLayout.Dock = DockStyle.Fill;
-            usbLayout.ColumnStyles.Clear();
-            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 10f)); // FC/Arduino label
-            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 24f)); // Port combo
-            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 8f));  // Baud label
-            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 10f)); // Baud value
-            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16f)); // Refresh
-            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16f)); // Connect
-            usbLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16f)); // Disconnect
-
-            cboPort.Dock = DockStyle.Fill;
-            cboArduinoPort.Dock = DockStyle.Fill;
-            btnRefreshPorts.Dock = DockStyle.Fill;
-            btnConnect.Dock = DockStyle.Fill;
-            btnDisconnect.Dock = DockStyle.Fill;
-            btnArduinoConnect.Dock = DockStyle.Fill;
-            btnArduinoDisconnect.Dock = DockStyle.Fill;
-            lblStatus.Dock = DockStyle.Fill;
-        }
-        finally
-        {
-            usbLayout.ResumeLayout();
-        }
     }
 
     private async Task DiscoverPortsOnStartupAsync()
@@ -168,7 +83,7 @@ public sealed partial class MainForm : Form
                 {
                     try
                     {
-                        _serialPortService.Connect(candidate, FixedSerialBaud);
+                        _serialPortService.Connect(candidate, _fcBaudRate);
                         fcConnectedPort = candidate;
                         break;
                     }
@@ -231,7 +146,7 @@ public sealed partial class MainForm : Form
                 var arduinoText = string.IsNullOrWhiteSpace(result.arduinoPort)
                     ? "Arduino not connected."
                     : $"Arduino on {result.arduinoPort}.";
-                lblStatus.Text = $"Startup auto-connect: FC on {result.fcConnectedPort}@{FixedSerialBaud}. {arduinoText}";
+                lblStatus.Text = $"Startup auto-connect: FC on {result.fcConnectedPort}@{_fcBaudRate}. {arduinoText}";
             }
             else
             {
@@ -330,9 +245,9 @@ public sealed partial class MainForm : Form
     private void LoadChannelMapping()
     {
         var mapping = _settingsService.LoadMapping();
-        SetComboValue(cboRoll, mapping.Roll);
-        SetComboValue(cboPitch, mapping.Pitch);
-        SetComboValue(cboThrottle, mapping.Throttle);
+        SetComboValue(cboCH1, mapping.Roll);
+        SetComboValue(cboCH2, mapping.Pitch);
+        SetComboValue(cboCH3, mapping.Throttle);
         lblStatus.Text = "Loaded channel mapping.";
     }
 
@@ -340,9 +255,9 @@ public sealed partial class MainForm : Form
     {
         var mapping = new ChannelMapping
         {
-            Roll = GetComboValue(cboRoll, 1),
-            Pitch = GetComboValue(cboPitch, 2),
-            Throttle = GetComboValue(cboThrottle, 3),
+            Roll = GetComboValue(cboCH1, 1),
+            Pitch = GetComboValue(cboCH2, 2),
+            Throttle = GetComboValue(cboCH3, 3),
         };
         _settingsService.SaveMapping(mapping);
         lblStatus.Text = $"Saved mapping: Roll CH{mapping.Roll}, Pitch CH{mapping.Pitch}, Throttle CH{mapping.Throttle}";
@@ -363,12 +278,6 @@ public sealed partial class MainForm : Form
         {
             combo.SelectedIndex = 0;
         }
-    }
-
-    private void LoadSerialDefaults()
-    {
-        lblBaudValue.Text = FixedSerialBaud.ToString(CultureInfo.InvariantCulture);
-        lblArduinoBaudValue.Text = FixedSerialBaud.ToString(CultureInfo.InvariantCulture);
     }
 
     private void RefreshPortList()
@@ -421,7 +330,7 @@ public sealed partial class MainForm : Form
     {
         try
         {
-            using var probe = new SerialPort(portName, FixedSerialBaud)
+            using var probe = new SerialPort(portName, DefaultSerialBaud)
             {
                 ReadTimeout = 150,
                 WriteTimeout = 150,
@@ -444,7 +353,7 @@ public sealed partial class MainForm : Form
             MessageBox.Show(this, "Select an FC USB serial port first.", "Missing port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        var baudRate = FixedSerialBaud;
+        var baudRate = _fcBaudRate;
 
         try
         {
@@ -474,7 +383,7 @@ public sealed partial class MainForm : Form
             MessageBox.Show(this, "Select an Arduino serial port first.", "Missing port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        var baudRate = FixedSerialBaud;
+        var baudRate = _arduinoBaudRate;
 
         _arduinoConnected = true;
         lblStatus.Text = $"Arduino controls queued: {portName}@{baudRate}.";
@@ -499,6 +408,79 @@ public sealed partial class MainForm : Form
         btnArduinoConnect.Enabled = !_startupScanInProgress && !_arduinoConnected && arduinoPortSelected;
         btnArduinoDisconnect.Enabled = _arduinoConnected;
         UpdateWorkflowUiState();
+    }
+
+    private void InitializeBaudSelectors()
+    {
+        ConfigureBaudCombo(cboBaud, DefaultSerialBaud);
+        ConfigureBaudCombo(cboArduinoBaud, DefaultSerialBaud);
+        _fcBaudRate = DefaultSerialBaud;
+        _arduinoBaudRate = DefaultSerialBaud;
+    }
+
+    private static void ConfigureBaudCombo(ComboBox combo, int defaultBaud)
+    {
+        combo.DropDownStyle = ComboBoxStyle.DropDownList;
+        combo.Items.Clear();
+        combo.Items.Add("9600");
+        combo.Items.Add("115200");
+        combo.SelectedItem = defaultBaud.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static int GetSelectedBaud(ComboBox combo, int fallback)
+    {
+        var raw = combo.SelectedItem?.ToString();
+        return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : fallback;
+    }
+
+    private void OnFcBaudChanged()
+    {
+        var selected = GetSelectedBaud(cboBaud, DefaultSerialBaud);
+        if (selected == _fcBaudRate)
+        {
+            return;
+        }
+
+        _fcBaudRate = selected;
+        if (_serialPortService.IsConnected && cboPort.SelectedItem is string port && !string.IsNullOrWhiteSpace(port))
+        {
+            try
+            {
+                StopTelemetryLoop("Live telemetry stopped for FC baud change.");
+                _serialPortService.Disconnect();
+                _serialPortService.Connect(port, _fcBaudRate);
+                lblStatus.Text = $"FC baud changed: {port}@{_fcBaudRate}";
+            }
+            catch (Exception ex)
+            {
+                lblStatus.Text = $"FC baud change failed: {ex.Message}";
+            }
+        }
+        else
+        {
+            lblStatus.Text = $"FC baud set to {_fcBaudRate}.";
+        }
+    }
+
+    private void OnArduinoBaudChanged()
+    {
+        var selected = GetSelectedBaud(cboArduinoBaud, DefaultSerialBaud);
+        if (selected == _arduinoBaudRate)
+        {
+            return;
+        }
+
+        _arduinoBaudRate = selected;
+        if (_arduinoConnected && cboArduinoPort.SelectedItem is string port && !string.IsNullOrWhiteSpace(port))
+        {
+            lblStatus.Text = $"Arduino baud changed: {port}@{_arduinoBaudRate}";
+        }
+        else
+        {
+            lblStatus.Text = $"Arduino baud set to {_arduinoBaudRate}.";
+        }
     }
 
     private ControlPath GetActiveControlPath()
@@ -583,9 +565,9 @@ public sealed partial class MainForm : Form
         var throttleUs = (int)nudThrottleUs.Value;
         var mapping = new ChannelMapping
         {
-            Roll = GetComboValue(cboRoll, 1),
-            Pitch = GetComboValue(cboPitch, 2),
-            Throttle = GetComboValue(cboThrottle, 3),
+            Roll = GetComboValue(cboCH1, 1),
+            Pitch = GetComboValue(cboCH2, 2),
+            Throttle = GetComboValue(cboCH3, 3),
         };
         var channelNumber = control switch
         {
@@ -752,272 +734,6 @@ public sealed partial class MainForm : Form
         cmbManualPoints.Items.AddRange(new object[] { "1", "2", "3", "4", "5" });
         cmbManualPoints.SelectedIndex = 0;
         UpdateWorkflowUiState();
-    }
-
-    private void InitializeDockWorkspace()
-    {
-        if (_dockWorkspaceInitialized)
-        {
-            return;
-        }
-
-        _dockWorkspaceInitialized = true;
-        _dockWorkspace = CreateDockWorkspace();
-
-        topLayout.Controls.Remove(grpUsb);
-        topLayout.Controls.Remove(grpMapping);
-        topLayout.Visible = false;
-        rootLayout.RowStyles[0].SizeType = SizeType.Absolute;
-        rootLayout.RowStyles[0].Height = 0;
-
-        grpPortingArea.Controls.Clear();
-        grpPortingArea.Controls.Add(_dockWorkspace);
-
-        PrepareSectionForDocking(grpUsb);
-        PrepareSectionForDocking(grpMapping);
-        PrepareSectionForDocking(grpTelemetry);
-        PrepareSectionForDocking(grpChannelTest);
-        PrepareSectionForDocking(grpPidWorkflow);
-        PrepareSectionForDocking(grpTuningProgress);
-
-        var serialContent = new DockSectionContent(grpUsb.Text, PersistKeySerialPorts, grpUsb);
-        var mappingContent = new DockSectionContent(grpMapping.Text, PersistKeyPpmMapping, grpMapping);
-        var telemetryContent = new DockSectionContent(grpTelemetry.Text, PersistKeyTelemetry, grpTelemetry);
-        var channelContent = new DockSectionContent(grpChannelTest.Text, PersistKeyChannelTest, grpChannelTest);
-        var pidContent = new DockSectionContent(grpPidWorkflow.Text, PersistKeyPidWorkflow, grpPidWorkflow);
-        var progressContent = new DockSectionContent(grpTuningProgress.Text, PersistKeyTuningProgress, grpTuningProgress);
-
-        _dockSections.Clear();
-        _dockSections[PersistKeySerialPorts] = serialContent;
-        _dockSections[PersistKeyPpmMapping] = mappingContent;
-        _dockSections[PersistKeyTelemetry] = telemetryContent;
-        _dockSections[PersistKeyChannelTest] = channelContent;
-        _dockSections[PersistKeyPidWorkflow] = pidContent;
-        _dockSections[PersistKeyTuningProgress] = progressContent;
-
-        // Ensure any previously saved dock layout is removed so designer layout is used.
-        TryDeleteDockLayoutFile();
-        ApplyDefaultDockLayout();
-        EnsureDockSectionsVisible();
-    }
-
-    private static void PrepareSectionForDocking(Control root)
-    {
-        if (root is GroupBox groupBox)
-        {
-            groupBox.AutoSize = false;
-            groupBox.AutoSizeMode = AutoSizeMode.GrowOnly;
-            groupBox.Dock = DockStyle.Fill;
-        }
-
-        if (root is ScrollableControl scrollable)
-        {
-            scrollable.AutoScroll = true;
-        }
-
-        foreach (Control child in root.Controls)
-        {
-            if (child is TableLayoutPanel table)
-            {
-                table.AutoSize = false;
-                table.Dock = DockStyle.Fill;
-            }
-
-            PrepareSectionForDocking(child);
-        }
-    }
-
-    private void EnsureDockTheme()
-    {
-        if (_dockWorkspace is null)
-        {
-            return;
-        }
-
-        if (_dockWorkspace.Theme is null)
-        {
-            _dockWorkspace.Theme = new VS2015LightTheme();
-        }
-    }
-
-    private static DockPanel CreateDockWorkspace()
-    {
-        var dockWorkspace = new DockPanel
-        {
-            Dock = DockStyle.Fill,
-            DocumentStyle = DocumentStyle.DockingWindow,
-            AllowEndUserDocking = true,
-            AllowEndUserNestedDocking = true,
-            Theme = new VS2015LightTheme(),
-        };
-        return dockWorkspace;
-    }
-
-    private void ApplyDefaultDockLayout()
-    {
-        if (_dockWorkspace is null)
-        {
-            return;
-        }
-        EnsureDockTheme();
-
-        var telemetryContent = _dockSections[PersistKeyTelemetry];
-        var channelContent = _dockSections[PersistKeyChannelTest];
-        var pidContent = _dockSections[PersistKeyPidWorkflow];
-        var progressContent = _dockSections[PersistKeyTuningProgress];
-        var serialContent = _dockSections[PersistKeySerialPorts];
-        var mappingContent = _dockSections[PersistKeyPpmMapping];
-
-        try
-        {
-            serialContent.Show(_dockWorkspace, DockState.DockTop);
-            mappingContent.Show(_dockWorkspace, DockState.DockTop);
-            telemetryContent.Show(_dockWorkspace, DockState.DockTop);
-            channelContent.Show(_dockWorkspace, DockState.Document);
-            pidContent.Show(_dockWorkspace, DockState.DockRight);
-            progressContent.Show(_dockWorkspace, DockState.DockBottom);
-            _dockRecoveryAttempted = false;
-        }
-        catch (ArgumentException)
-        {
-            RecoverDockWorkspace();
-        }
-    }
-
-    private bool TryRestoreDockLayout()
-    {
-        // Restoring persisted dock layouts disabled to keep runtime UI consistent with the Designer.
-        return false;
-    }
-
-    private void RecoverDockWorkspace()
-    {
-        if (_dockRecoveryAttempted)
-        {
-            lblStatus.Text = "Dock layout recovery failed. Delete saved layout and restart app.";
-            return;
-        }
-
-        _dockRecoveryAttempted = true;
-        TryDeleteDockLayoutFile();
-
-        if (_dockWorkspace is not null)
-        {
-            grpPortingArea.Controls.Remove(_dockWorkspace);
-            _dockWorkspace.Dispose();
-        }
-
-        _dockWorkspace = CreateDockWorkspace();
-        grpPortingArea.Controls.Clear();
-        grpPortingArea.Controls.Add(_dockWorkspace);
-        EnsureDockTheme();
-
-        try
-        {
-            var telemetryContent = _dockSections[PersistKeyTelemetry];
-            var channelContent = _dockSections[PersistKeyChannelTest];
-            var pidContent = _dockSections[PersistKeyPidWorkflow];
-            var progressContent = _dockSections[PersistKeyTuningProgress];
-            var serialContent = _dockSections[PersistKeySerialPorts];
-            var mappingContent = _dockSections[PersistKeyPpmMapping];
-
-            serialContent.Show(_dockWorkspace, DockState.DockTop);
-            mappingContent.Show(_dockWorkspace, DockState.DockTop);
-            telemetryContent.Show(_dockWorkspace, DockState.DockTop);
-            channelContent.Show(_dockWorkspace, DockState.Document);
-            pidContent.Show(_dockWorkspace, DockState.DockRight);
-            progressContent.Show(_dockWorkspace, DockState.DockBottom);
-            lblStatus.Text = "Dock layout reset to default.";
-        }
-        catch
-        {
-            lblStatus.Text = "Dock layout recovery failed. Delete saved layout and restart app.";
-        }
-    }
-
-    private void TryDeleteDockLayoutFile()
-    {
-        try
-        {
-            var path = GetDockLayoutPath();
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch
-        {
-            // Ignore cleanup failures.
-        }
-    }
-
-    private bool HasVisibleDockContent()
-    {
-        if (_dockWorkspace is null)
-        {
-            return false;
-        }
-
-        foreach (var section in _dockSections.Values)
-        {
-            if (section.DockPanel != _dockWorkspace)
-            {
-                continue;
-            }
-
-            if (section.DockState != DockState.Hidden && section.DockState != DockState.Unknown)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private void EnsureDockSectionsVisible()
-    {
-        if (_dockWorkspace is null)
-        {
-            return;
-        }
-
-        ShowIfMissingOrHidden(PersistKeySerialPorts, DockState.DockTop);
-        ShowIfMissingOrHidden(PersistKeyPpmMapping, DockState.DockTop);
-        ShowIfMissingOrHidden(PersistKeyTelemetry, DockState.DockLeft);
-        ShowIfMissingOrHidden(PersistKeyChannelTest, DockState.Document);
-        ShowIfMissingOrHidden(PersistKeyPidWorkflow, DockState.DockRight);
-        ShowIfMissingOrHidden(PersistKeyTuningProgress, DockState.DockBottom);
-    }
-
-    private void ShowIfMissingOrHidden(string key, DockState defaultState)
-    {
-        if (_dockWorkspace is null || !_dockSections.TryGetValue(key, out var section))
-        {
-            return;
-        }
-
-        if (section.DockPanel != _dockWorkspace || section.DockState == DockState.Hidden || section.DockState == DockState.Unknown)
-        {
-            section.Show(_dockWorkspace, defaultState);
-        }
-    }
-
-    private IDockContent? DeserializeDockContent(string persistString)
-    {
-        return _dockSections.TryGetValue(persistString, out var content) ? content : null;
-    }
-
-    private void SaveDockLayout()
-    {
-        // Persisting layout disabled to avoid runtime layout drift.
-    }
-
-    private static string GetDockLayoutPath()
-    {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var folder = Path.Combine(appData, "DronePidTuningAssistantWinForms", "layouts");
-        var machine = Environment.MachineName;
-        return Path.Combine(folder, $"docklayout_{machine}.xml");
     }
 
     private async Task RunPidTuningRoundAsync(string axis, bool resetAxis)
