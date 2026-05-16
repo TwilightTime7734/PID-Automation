@@ -41,11 +41,6 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        ConfigureChannelCombo(cboCH1);
-        ConfigureChannelCombo(cboCH2);
-        ConfigureChannelCombo(cboCH3);
-        ConfigureChannelCombo(cboCH4);
-        InitializeBaudSelectors();
         Shown += async (_, _) => await DiscoverPortsOnStartupAsync();
         cboPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
         cboArduinoPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
@@ -61,7 +56,8 @@ public sealed partial class MainForm : Form
     private async Task DiscoverPortsOnStartupAsync()
     {
         _startupScanInProgress = true;
-        lblStatus.Text = "Startup scan in progress...";
+        SetFcStatus("Startup scan in progress...");
+        SetArduinoStatus("Arduino not connected.");
         UpdateSerialConnectionUi();
 
         try
@@ -139,18 +135,22 @@ public sealed partial class MainForm : Form
 
             if (result.source.Count == 0)
             {
-                lblStatus.Text = "Startup scan: no serial ports detected.";
+                SetFcStatus("FC not connected.");
+                SetArduinoStatus("Arduino not connected.");
             }
             else if (!string.IsNullOrWhiteSpace(result.fcConnectedPort))
             {
-                var arduinoText = string.IsNullOrWhiteSpace(result.arduinoPort)
+                SetFcStatus($"Startup: FC on {result.fcConnectedPort}@{_fcBaudRate}.");
+                SetArduinoStatus(string.IsNullOrWhiteSpace(result.arduinoPort)
                     ? "Arduino not connected."
-                    : $"Arduino on {result.arduinoPort}.";
-                lblStatus.Text = $"Startup auto-connect: FC on {result.fcConnectedPort}@{_fcBaudRate}. {arduinoText}";
+                    : $"Arduino connected: {result.arduinoPort}@{_arduinoBaudRate}");
             }
             else
             {
-                lblStatus.Text = "Startup auto-connect: FC not connected (tried top 2 candidates).";
+                SetFcStatus("FC not connected.");
+                SetArduinoStatus(string.IsNullOrWhiteSpace(result.arduinoPort)
+                    ? "Arduino not connected."
+                    : $"Arduino connected: {result.arduinoPort}@{_arduinoBaudRate}");
             }
         }
         finally
@@ -232,43 +232,35 @@ public sealed partial class MainForm : Form
         return result;
     }
 
-    private static void ConfigureChannelCombo(ComboBox combo)
-    {
-        combo.DropDownStyle = ComboBoxStyle.DropDownList;
-        combo.Items.Clear();
-        for (var i = 1; i <= 8; i++)
-        {
-            combo.Items.Add(i);
-        }
-    }
-
     private void LoadChannelMapping()
     {
         var mapping = _settingsService.LoadMapping();
         SetComboValue(cboCH1, mapping.Roll);
         SetComboValue(cboCH2, mapping.Pitch);
         SetComboValue(cboCH3, mapping.Throttle);
-        lblStatus.Text = "Loaded channel mapping.";
+        SetComboValue(cboCH4, mapping.Yaw);
+        lblFCStatus.Text = "Loaded channel mapping.";
     }
 
     private void SaveChannelMapping()
     {
         var mapping = new ChannelMapping
         {
-            Roll = GetComboValue(cboCH1, 1),
-            Pitch = GetComboValue(cboCH2, 2),
-            Throttle = GetComboValue(cboCH3, 3),
+            Roll = GetComboValue(cboCH1, "A"),
+            Pitch = GetComboValue(cboCH2, "E"),
+            Throttle = GetComboValue(cboCH3, "T"),
+            Yaw = GetComboValue(cboCH4, "R"),
         };
         _settingsService.SaveMapping(mapping);
-        lblStatus.Text = $"Saved mapping: Roll CH{mapping.Roll}, Pitch CH{mapping.Pitch}, Throttle CH{mapping.Throttle}";
+        lblFCStatus.Text = $"Saved mapping: Roll {mapping.Roll}, Pitch {mapping.Pitch}, Throttle {mapping.Throttle}, Yaw {mapping.Yaw}";
     }
 
-    private static int GetComboValue(ComboBox combo, int fallback)
+    private static string GetComboValue(ComboBox combo, string fallback)
     {
-        return combo.SelectedItem is int value ? value : fallback;
+        return combo.SelectedItem?.ToString() ?? fallback;
     }
 
-    private static void SetComboValue(ComboBox combo, int value)
+    private static void SetComboValue(ComboBox combo, string value)
     {
         if (combo.Items.Contains(value))
         {
@@ -280,11 +272,25 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private void ApplyMappingPreset(string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern) || pattern.Length != 4)
+        {
+            return;
+        }
+
+        SetComboValue(cboCH1, pattern[0].ToString());
+        SetComboValue(cboCH2, pattern[1].ToString());
+        SetComboValue(cboCH3, pattern[2].ToString());
+        SetComboValue(cboCH4, pattern[3].ToString());
+        lblFCStatus.Text = $"Applied mapping preset: {pattern}";
+    }
+
     private void RefreshPortList()
     {
         var ports = _serialPortService.GetAvailablePorts();
         PopulatePortCombos(ports);
-        lblStatus.Text = ports.Count == 0
+        lblFCStatus.Text = ports.Count == 0
             ? "No serial ports detected."
             : $"Detected {ports.Count} serial port(s).";
         UpdateSerialConnectionUi();
@@ -358,20 +364,20 @@ public sealed partial class MainForm : Form
         try
         {
             _serialPortService.Connect(portName, baudRate);
-            lblStatus.Text = $"Connected FC USB: {portName}@{baudRate}";
+            lblFCStatus.Text = $"Connected FC USB: {portName}@{baudRate}";
             UpdateSerialConnectionUi();
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Connection failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            lblStatus.Text = "FC USB connection failed.";
+            lblFCStatus.Text = "FC USB connection failed.";
             UpdateSerialConnectionUi();
         }
     }
 
     private void DisconnectUsb()
     {
-        StopTelemetryLoop("FC USB disconnected.");
+        StopTelemetryLoop("FC not connected.");
         _serialPortService.Disconnect();
         UpdateSerialConnectionUi();
     }
@@ -386,14 +392,14 @@ public sealed partial class MainForm : Form
         var baudRate = _arduinoBaudRate;
 
         _arduinoConnected = true;
-        lblStatus.Text = $"Arduino controls queued: {portName}@{baudRate}.";
+        SetArduinoStatus($"Arduino connected: {portName}@{baudRate}");
         UpdateSerialConnectionUi();
     }
 
     private void DisconnectArduinoUsb()
     {
         _arduinoConnected = false;
-        lblStatus.Text = "Arduino serial disconnected.";
+        SetArduinoStatus("Arduino not connected.");
         UpdateSerialConnectionUi();
     }
 
@@ -401,30 +407,13 @@ public sealed partial class MainForm : Form
     {
         var fcConnected = _serialPortService.IsConnected;
         var fcPortSelected = cboPort.SelectedItem is string fcPort && !string.IsNullOrWhiteSpace(fcPort);
-        btnConnect.Enabled = !_startupScanInProgress && !fcConnected && fcPortSelected;
-        btnDisconnect.Enabled = fcConnected;
+        btnFcConnect.Enabled = !_startupScanInProgress && !fcConnected && fcPortSelected;
+        btnFcDisconnect.Enabled = fcConnected;
 
         var arduinoPortSelected = cboArduinoPort.SelectedItem is string arduinoPort && !string.IsNullOrWhiteSpace(arduinoPort);
         btnArduinoConnect.Enabled = !_startupScanInProgress && !_arduinoConnected && arduinoPortSelected;
         btnArduinoDisconnect.Enabled = _arduinoConnected;
         UpdateWorkflowUiState();
-    }
-
-    private void InitializeBaudSelectors()
-    {
-        ConfigureBaudCombo(cboBaud, DefaultSerialBaud);
-        ConfigureBaudCombo(cboArduinoBaud, DefaultSerialBaud);
-        _fcBaudRate = DefaultSerialBaud;
-        _arduinoBaudRate = DefaultSerialBaud;
-    }
-
-    private static void ConfigureBaudCombo(ComboBox combo, int defaultBaud)
-    {
-        combo.DropDownStyle = ComboBoxStyle.DropDownList;
-        combo.Items.Clear();
-        combo.Items.Add("9600");
-        combo.Items.Add("115200");
-        combo.SelectedItem = defaultBaud.ToString(CultureInfo.InvariantCulture);
     }
 
     private static int GetSelectedBaud(ComboBox combo, int fallback)
@@ -451,16 +440,16 @@ public sealed partial class MainForm : Form
                 StopTelemetryLoop("Live telemetry stopped for FC baud change.");
                 _serialPortService.Disconnect();
                 _serialPortService.Connect(port, _fcBaudRate);
-                lblStatus.Text = $"FC baud changed: {port}@{_fcBaudRate}";
+                lblFCStatus.Text = $"FC baud changed: {port}@{_fcBaudRate}";
             }
             catch (Exception ex)
             {
-                lblStatus.Text = $"FC baud change failed: {ex.Message}";
+                lblFCStatus.Text = $"FC baud change failed: {ex.Message}";
             }
         }
         else
         {
-            lblStatus.Text = $"FC baud set to {_fcBaudRate}.";
+            lblFCStatus.Text = $"FC baud set to {_fcBaudRate}.";
         }
     }
 
@@ -475,12 +464,24 @@ public sealed partial class MainForm : Form
         _arduinoBaudRate = selected;
         if (_arduinoConnected && cboArduinoPort.SelectedItem is string port && !string.IsNullOrWhiteSpace(port))
         {
-            lblStatus.Text = $"Arduino baud changed: {port}@{_arduinoBaudRate}";
+            SetArduinoStatus($"Arduino connected: {port}@{_arduinoBaudRate}");
         }
         else
         {
-            lblStatus.Text = $"Arduino baud set to {_arduinoBaudRate}.";
+            SetArduinoStatus($"Arduino not connected. Baud set to {_arduinoBaudRate}.");
         }
+    }
+
+    private void SetFcStatus(string text)
+    {
+        lblFCStatus.Text = string.Empty;
+        lblFCStatus.Text = text;
+    }
+
+    private void SetArduinoStatus(string text)
+    {
+        lblArduinoStatus.Text = string.Empty;
+        lblArduinoStatus.Text = text;
     }
 
     private ControlPath GetActiveControlPath()
@@ -565,21 +566,21 @@ public sealed partial class MainForm : Form
         var throttleUs = (int)nudThrottleUs.Value;
         var mapping = new ChannelMapping
         {
-            Roll = GetComboValue(cboCH1, 1),
-            Pitch = GetComboValue(cboCH2, 2),
-            Throttle = GetComboValue(cboCH3, 3),
+            Roll = GetComboValue(cboCH1, "A"),
+            Pitch = GetComboValue(cboCH2, "E"),
+            Throttle = GetComboValue(cboCH3, "T"),
         };
-        var channelNumber = control switch
+        var channelCode = control switch
         {
             "roll" => mapping.Roll,
             "pitch" => mapping.Pitch,
             "throttle" => mapping.Throttle,
-            _ => 0,
+            _ => "-",
         };
 
         try
         {
-            lblStatus.Text = $"Testing {control} on CH{channelNumber} via {DescribeControlPath(activePath)}...";
+            lblFCStatus.Text = $"Testing {control} on {channelCode} via {DescribeControlPath(activePath)}...";
 
             if (settleMs > 0)
             {
@@ -626,7 +627,7 @@ public sealed partial class MainForm : Form
             }
 
             SetChannelTestVisual("Idle", control == "throttle" ? 1000 : 1500, 0.0, 0.0);
-            lblStatus.Text = $"Completed {control} channel test on CH{channelNumber} via {DescribeControlPath(activePath)}.";
+            lblFCStatus.Text = $"Completed {control} channel test on {channelCode} via {DescribeControlPath(activePath)}.";
         }
         finally
         {
@@ -697,14 +698,14 @@ public sealed partial class MainForm : Form
 
         _telemetryTimer?.Start();
         UpdateWorkflowUiState();
-        lblStatus.Text = "Live telemetry started.";
+        lblFCStatus.Text = "Live telemetry started.";
     }
 
     private void StopTelemetryLoop(string statusText = "Live telemetry stopped.")
     {
         _telemetryTimer?.Stop();
         UpdateWorkflowUiState();
-        lblStatus.Text = statusText;
+        lblFCStatus.Text = statusText;
     }
 
     private void TelemetrySnapshot()
@@ -716,7 +717,7 @@ public sealed partial class MainForm : Form
         }
 
         PollTelemetrySample();
-        lblStatus.Text = "Telemetry snapshot updated.";
+        lblFCStatus.Text = "Telemetry snapshot updated.";
     }
 
     private void InitializePidWorkflow()
@@ -756,7 +757,7 @@ public sealed partial class MainForm : Form
 
         var iteration = axis == "roll" ? ++_rollIteration : ++_pitchIteration;
         lblActiveAxis.Text = $"{axis.ToUpperInvariant()} round {iteration}";
-        lblStatus.Text = $"Running {axis} tuning round {iteration}...";
+        lblFCStatus.Text = $"Running {axis} tuning round {iteration}...";
         SetPidButtonsEnabled(false);
         SetChannelTestButtonsEnabled(false);
 
@@ -772,11 +773,11 @@ public sealed partial class MainForm : Form
 
             txtPidRecommendation.Text = recommendation.Message;
             AppendTuningRun(axis, iteration, score, recommendation);
-            lblStatus.Text = $"Completed {axis} round {iteration}. Score {score:F2}.";
+            lblFCStatus.Text = $"Completed {axis} round {iteration}. Score {score:F2}.";
         }
         catch (Exception ex)
         {
-            lblStatus.Text = $"PID workflow failed: {ex.Message}";
+            lblFCStatus.Text = $"PID workflow failed: {ex.Message}";
         }
         finally
         {
@@ -877,13 +878,13 @@ public sealed partial class MainForm : Form
             var applied = _serialPortService.SetSettingInt(settingName, target);
             _serialPortService.SaveSettings();
 
-            lblStatus.Text = $"Applied PID: {settingName} {current} -> {applied} and saved.";
+            lblFCStatus.Text = $"Applied PID: {settingName} {current} -> {applied} and saved.";
             txtPidRecommendation.Text += $"{Environment.NewLine}{Environment.NewLine}Applied to FC: {settingName} {current} -> {applied}.";
             RefreshPidSnapshotFromFc();
         }
         catch (Exception ex)
         {
-            lblStatus.Text = $"PID write failed: {ex.Message}";
+            lblFCStatus.Text = $"PID write failed: {ex.Message}";
             MessageBox.Show(this, ex.Message, "PID write failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
@@ -912,13 +913,13 @@ public sealed partial class MainForm : Form
             var delta = direction.Equals("increase", StringComparison.OrdinalIgnoreCase) ? points : -points;
             var target = Math.Max(0, Math.Min(255, current + delta));
             var applied = _serialPortService.SetSettingInt(settingName, target);
-            lblStatus.Text = $"Manual PID: {settingName} {current} -> {applied}";
+            lblFCStatus.Text = $"Manual PID: {settingName} {current} -> {applied}";
             RefreshPidSnapshotFromFc();
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Manual PID write failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            lblStatus.Text = "Manual PID write failed.";
+            lblFCStatus.Text = "Manual PID write failed.";
         }
     }
 
@@ -943,12 +944,12 @@ public sealed partial class MainForm : Form
                 $"FC PID values:{Environment.NewLine}" +
                 $"Roll P/I/D: {rp}/{ri}/{rd}{Environment.NewLine}" +
                 $"Pitch P/I/D: {pp}/{pi}/{pd}";
-            lblStatus.Text = "Read PID values from FC.";
+            lblFCStatus.Text = "Read PID values from FC.";
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Read FC failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            lblStatus.Text = "Read FC failed.";
+            lblFCStatus.Text = "Read FC failed.";
         }
     }
 
@@ -962,13 +963,13 @@ public sealed partial class MainForm : Form
         try
         {
             _serialPortService.SaveSettings();
-            lblStatus.Text = "Saved current PID values to FC.";
+            lblFCStatus.Text = "Saved current PID values to FC.";
             RefreshPidSnapshotFromFc();
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Save FC failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            lblStatus.Text = "Save FC failed.";
+            lblFCStatus.Text = "Save FC failed.";
         }
     }
 
@@ -1037,7 +1038,7 @@ public sealed partial class MainForm : Form
         _activeAxis = null;
         lblActiveAxis.Text = "N/A";
         txtPidRecommendation.Text = "Axis tuning stopped. Run Roll or Pitch to continue.";
-        lblStatus.Text = "Axis tuning finished.";
+        lblFCStatus.Text = "Axis tuning finished.";
     }
 
     private void DrawScoreChart(Graphics g, Rectangle bounds)
@@ -1105,6 +1106,9 @@ public sealed partial class MainForm : Form
     private void btnConnect_Click(object sender, EventArgs e) => ConnectUsb();
     private void btnDisconnect_Click(object sender, EventArgs e) => DisconnectUsb();
     private void btnApplyMapping_Click(object sender, EventArgs e) => SaveChannelMapping();
+    private void btnPresetAetr_Click(object sender, EventArgs e) => ApplyMappingPreset("AETR");
+    private void btnPresetRtae_Click(object sender, EventArgs e) => ApplyMappingPreset("RTAE");
+    private void btnPresetReat_Click(object sender, EventArgs e) => ApplyMappingPreset("REAT");
     private void btnArduinoConnect_Click(object sender, EventArgs e) => ConnectArduinoUsb();
     private void btnArduinoDisconnect_Click(object sender, EventArgs e) => DisconnectArduinoUsb();
     private async void btnTestRoll_Click(object sender, EventArgs e) => await RunChannelTestAsync("roll");
