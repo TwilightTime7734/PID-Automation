@@ -18,10 +18,13 @@ public sealed partial class MainForm : Form
     }
 
     private const int DefaultSerialBaud = 115200;
+    private const int DefaultTrainerPin = 3;
+    private const double MaxCommandDeg = 45.0;
     private int _fcBaudRate = DefaultSerialBaud;
     private int _arduinoBaudRate = DefaultSerialBaud;
     private readonly LayoutSettingsService _settingsService = new();
     private readonly SerialPortService _serialPortService = new();
+    private readonly ArduinoTrainerCableClient _arduinoTrainerClient = new();
     private readonly List<TuningRunRecord> _tuningRuns = new();
     private bool _channelTestRunning;
     private bool _arduinoConnected;
@@ -31,6 +34,21 @@ public sealed partial class MainForm : Form
     private int _rollIteration;
     private int _pitchIteration;
     private PidAdjustmentRecommendation? _pendingRecommendation;
+    private int _ch1PulseUs = 1500;
+    private int _ch2PulseUs = 1500;
+    private int _ch3PulseUs = 1000;
+    private int _ch4PulseUs = 1500;
+    private double _ch1DisplayedPulseUs = 1500;
+    private double _ch2DisplayedPulseUs = 1500;
+    private double _ch3DisplayedPulseUs = 1000;
+    private double _ch4DisplayedPulseUs = 1500;
+    private System.Windows.Forms.Timer? _stickAnimationTimer;
+
+    // Stick UI controls for channel test visualizers
+    private Panel _pnlLeftStick => pnlLeftStick;
+    private Panel _pnlLeftStickIndicator => pnlLeftStickIndicator;
+    private Panel _pnlRightStick => pnlRightStick;
+    private Panel _pnlRightStickIndicator => pnlRightStickIndicator;
 
     public MainForm()
     {
@@ -46,10 +64,20 @@ public sealed partial class MainForm : Form
         cboArduinoPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
         cboBaud.SelectedIndexChanged += (_, _) => OnFcBaudChanged();
         cboArduinoBaud.SelectedIndexChanged += (_, _) => OnArduinoBaudChanged();
+        cboTrainerPin.SelectedIndexChanged += (_, _) => OnTrainerPinChanged();
+        if (cboTrainerPin.Items.Count > 0)
+        {
+            cboTrainerPin.SelectedItem = DefaultTrainerPin.ToString(CultureInfo.InvariantCulture);
+        }
         RefreshPortList();
         LoadChannelMapping();
+        cboCH1.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
+        cboCH2.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
+        cboCH3.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
+        cboCH4.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
         InitializeTelemetry();
         InitializePidWorkflow();
+        InitializeStickVisuals();
         UpdateSerialConnectionUi();
     }
 
@@ -122,7 +150,7 @@ public sealed partial class MainForm : Form
             if (!string.IsNullOrWhiteSpace(result.arduinoPort) && cboArduinoPort.Items.Contains(result.arduinoPort))
             {
                 cboArduinoPort.SelectedItem = result.arduinoPort;
-                _arduinoConnected = true;
+                _arduinoConnected = false;
             }
             else
             {
@@ -143,14 +171,14 @@ public sealed partial class MainForm : Form
                 SetFcStatus($"Startup: FC on {result.fcConnectedPort}@{_fcBaudRate}.");
                 SetArduinoStatus(string.IsNullOrWhiteSpace(result.arduinoPort)
                     ? "Arduino not connected."
-                    : $"Arduino connected: {result.arduinoPort}@{_arduinoBaudRate}");
+                    : $"Arduino port detected: {result.arduinoPort} (not connected)");
             }
             else
             {
                 SetFcStatus("FC not connected.");
                 SetArduinoStatus(string.IsNullOrWhiteSpace(result.arduinoPort)
                     ? "Arduino not connected."
-                    : $"Arduino connected: {result.arduinoPort}@{_arduinoBaudRate}");
+                    : $"Arduino port detected: {result.arduinoPort} (not connected)");
             }
         }
         finally
@@ -174,6 +202,146 @@ public sealed partial class MainForm : Form
             || text.Contains("usb serial")
             || text.Contains("wchusbserial")
             || text.Contains("silicon labs");
+    }
+
+    private void InitializeStickVisuals()
+    {
+        _stickAnimationTimer = new System.Windows.Forms.Timer
+        {
+            Interval = 16,
+        };
+        _stickAnimationTimer.Tick += (_, _) => TickStickAnimation();
+        RefreshStickVisualsFromChannelState();
+    }
+
+    // pulse expected in microseconds 1000..2000 -> normalize to -1..1
+    private static double NormalizePulse(int pulse)
+    {
+        const double min = 1000.0;
+        const double max = 2000.0;
+        return Math.Max(-1.0, Math.Min(1.0, (pulse - ((min + max) / 2.0)) / ((max - min) / 2.0)));
+    }
+
+    private void UpdateLeftStick(int ch1Pulse, int ch2Pulse)
+    {
+        if (pnlLeftStick == null || pnlLeftStickIndicator == null) return;
+        var nx = NormalizePulse(ch1Pulse);
+        var ny = NormalizePulse(ch2Pulse);
+        UpdateStickIndicator(pnlLeftStick, pnlLeftStickIndicator, nx, ny);
+    }
+
+    private void UpdateRightStick(int ch3Pulse, int ch4Pulse)
+    {
+        if (pnlRightStick == null || pnlRightStickIndicator == null) return;
+        var nx = NormalizePulse(ch3Pulse);
+        var ny = NormalizePulse(ch4Pulse);
+        UpdateStickIndicator(pnlRightStick, pnlRightStickIndicator, nx, ny);
+    }
+
+    private void SetChannelPulseState(int channel, int pulseUs)
+    {
+        var clamped = Math.Max(1000, Math.Min(2000, pulseUs));
+        switch (channel)
+        {
+            case 1:
+                _ch1PulseUs = clamped;
+                break;
+            case 2:
+                _ch2PulseUs = clamped;
+                break;
+            case 3:
+                _ch3PulseUs = clamped;
+                break;
+            case 4:
+                _ch4PulseUs = clamped;
+                break;
+            default:
+                return;
+        }
+
+        if (_stickAnimationTimer?.Enabled != true)
+        {
+            _stickAnimationTimer?.Start();
+        }
+    }
+
+    private void RefreshStickVisualsFromChannelState()
+    {
+        // Axis-based visualization so Ch1..Ch4 mapping changes are reflected live.
+        // Right stick: Roll (A) X, Pitch (E) Y
+        // Left stick:  Yaw (R)  X, Throttle (T) Y
+        UpdateRightStick(GetDisplayedPulseForAxisCode("A"), GetDisplayedPulseForAxisCode("E"));
+        UpdateLeftStick(GetDisplayedPulseForAxisCode("R"), GetDisplayedPulseForAxisCode("T"));
+    }
+
+    private int GetDisplayedPulseForAxisCode(string axisCode)
+    {
+        if (string.Equals(GetComboValue(cboCH1, "A"), axisCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return (int)Math.Round(_ch1DisplayedPulseUs);
+        }
+
+        if (string.Equals(GetComboValue(cboCH2, "E"), axisCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return (int)Math.Round(_ch2DisplayedPulseUs);
+        }
+
+        if (string.Equals(GetComboValue(cboCH3, "T"), axisCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return (int)Math.Round(_ch3DisplayedPulseUs);
+        }
+
+        if (string.Equals(GetComboValue(cboCH4, "R"), axisCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return (int)Math.Round(_ch4DisplayedPulseUs);
+        }
+
+        return 1500;
+    }
+
+    private void TickStickAnimation()
+    {
+        const double smoothing = 0.33;
+        const double snapThresholdUs = 1.0;
+
+        _ch1DisplayedPulseUs += (_ch1PulseUs - _ch1DisplayedPulseUs) * smoothing;
+        _ch2DisplayedPulseUs += (_ch2PulseUs - _ch2DisplayedPulseUs) * smoothing;
+        _ch3DisplayedPulseUs += (_ch3PulseUs - _ch3DisplayedPulseUs) * smoothing;
+        _ch4DisplayedPulseUs += (_ch4PulseUs - _ch4DisplayedPulseUs) * smoothing;
+
+        var done =
+            Math.Abs(_ch1PulseUs - _ch1DisplayedPulseUs) < snapThresholdUs &&
+            Math.Abs(_ch2PulseUs - _ch2DisplayedPulseUs) < snapThresholdUs &&
+            Math.Abs(_ch3PulseUs - _ch3DisplayedPulseUs) < snapThresholdUs &&
+            Math.Abs(_ch4PulseUs - _ch4DisplayedPulseUs) < snapThresholdUs;
+
+        if (done)
+        {
+            _ch1DisplayedPulseUs = _ch1PulseUs;
+            _ch2DisplayedPulseUs = _ch2PulseUs;
+            _ch3DisplayedPulseUs = _ch3PulseUs;
+            _ch4DisplayedPulseUs = _ch4PulseUs;
+            _stickAnimationTimer?.Stop();
+        }
+
+        RefreshStickVisualsFromChannelState();
+    }
+
+    private static void UpdateStickIndicator(Panel container, Panel indicator, double nx, double ny)
+    {
+        // nx, ny in [-1,1], map to container interior with padding
+        var padding = 6;
+        var availableW = Math.Max(0, container.ClientSize.Width - indicator.Width - padding * 2);
+        var availableH = Math.Max(0, container.ClientSize.Height - indicator.Height - padding * 2);
+        var centerX = padding + (availableW / 2.0);
+        var centerY = padding + (availableH / 2.0);
+        var x = centerX + (nx * (availableW / 2.0));
+        var y = centerY - (ny * (availableH / 2.0)); // invert Y so up is negative
+        // ensure within bounds
+        x = Math.Max(padding, Math.Min(container.ClientSize.Width - indicator.Width - padding, x));
+        y = Math.Max(padding, Math.Min(container.ClientSize.Height - indicator.Height - padding, y));
+        indicator.Left = (int)Math.Round(x);
+        indicator.Top = (int)Math.Round(y);
     }
 
     private static bool IsLikelyFcPort(string friendlyName)
@@ -240,6 +408,7 @@ public sealed partial class MainForm : Form
         SetComboValue(cboCH3, mapping.Throttle);
         SetComboValue(cboCH4, mapping.Yaw);
         lblFCStatus.Text = "Loaded channel mapping.";
+        RefreshStickVisualsFromChannelState();
     }
 
     private void SaveChannelMapping()
@@ -253,6 +422,7 @@ public sealed partial class MainForm : Form
         };
         _settingsService.SaveMapping(mapping);
         lblFCStatus.Text = $"Saved mapping: Roll {mapping.Roll}, Pitch {mapping.Pitch}, Throttle {mapping.Throttle}, Yaw {mapping.Yaw}";
+        RefreshStickVisualsFromChannelState();
     }
 
     private static string GetComboValue(ComboBox combo, string fallback)
@@ -284,6 +454,7 @@ public sealed partial class MainForm : Form
         SetComboValue(cboCH3, pattern[2].ToString());
         SetComboValue(cboCH4, pattern[3].ToString());
         lblFCStatus.Text = $"Applied mapping preset: {pattern}";
+        RefreshStickVisualsFromChannelState();
     }
 
     private void RefreshPortList()
@@ -391,14 +562,43 @@ public sealed partial class MainForm : Form
         }
         var baudRate = _arduinoBaudRate;
 
-        _arduinoConnected = true;
-        SetArduinoStatus($"Arduino connected: {portName}@{baudRate}");
-        UpdateSerialConnectionUi();
+        try
+        {
+            _arduinoTrainerClient.Connect(portName, baudRate);
+            _ = _arduinoTrainerClient.SetPin(GetSelectedTrainerPin());
+            var status = _arduinoTrainerClient.Begin();
+            _arduinoConnected = true;
+            SetArduinoStatus($"Arduino connected: {portName}@{baudRate} (pin {status.OutputPin})");
+            CenterArduinoFlightControls();
+            UpdateSerialConnectionUi();
+        }
+        catch (Exception ex)
+        {
+            _arduinoConnected = false;
+            SetArduinoStatus("Arduino not connected.");
+            MessageBox.Show(this, ex.Message, "Arduino connection failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            UpdateSerialConnectionUi();
+        }
     }
 
     private void DisconnectArduinoUsb()
     {
-        _arduinoConnected = false;
+        try
+        {
+            if (_arduinoTrainerClient.IsConnected)
+            {
+                _ = _arduinoTrainerClient.End();
+            }
+        }
+        catch
+        {
+            // Ignore shutdown packet failures.
+        }
+        finally
+        {
+            _arduinoTrainerClient.Disconnect();
+            _arduinoConnected = false;
+        }
         SetArduinoStatus("Arduino not connected.");
         UpdateSerialConnectionUi();
     }
@@ -406,13 +606,18 @@ public sealed partial class MainForm : Form
     private void UpdateSerialConnectionUi()
     {
         var fcConnected = _serialPortService.IsConnected;
-        var fcPortSelected = cboPort.SelectedItem is string fcPort && !string.IsNullOrWhiteSpace(fcPort);
-        btnFcConnect.Enabled = !_startupScanInProgress && !fcConnected && fcPortSelected;
-        btnFcDisconnect.Enabled = fcConnected;
+        var selectedFcPort = cboPort.SelectedItem as string;
+        var fcPortSelected = !string.IsNullOrWhiteSpace(selectedFcPort);
+        var fcSelectedIsConnected = fcConnected
+            && fcPortSelected
+            && string.Equals(_serialPortService.ConnectedPortName, selectedFcPort, StringComparison.OrdinalIgnoreCase);
+        btnFcConnect.Enabled = !_startupScanInProgress && fcPortSelected && !fcSelectedIsConnected;
+        btnFcDisconnect.Enabled = fcSelectedIsConnected;
 
         var arduinoPortSelected = cboArduinoPort.SelectedItem is string arduinoPort && !string.IsNullOrWhiteSpace(arduinoPort);
-        btnArduinoConnect.Enabled = !_startupScanInProgress && !_arduinoConnected && arduinoPortSelected;
-        btnArduinoDisconnect.Enabled = _arduinoConnected;
+        var arduinoConnectedNow = _arduinoConnected || _arduinoTrainerClient.IsConnected;
+        btnArduinoConnect.Enabled = !_startupScanInProgress && arduinoPortSelected && !arduinoConnectedNow;
+        btnArduinoDisconnect.Enabled = arduinoConnectedNow;
         UpdateWorkflowUiState();
     }
 
@@ -422,6 +627,14 @@ public sealed partial class MainForm : Form
         return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
             ? parsed
             : fallback;
+    }
+
+    private int GetSelectedTrainerPin()
+    {
+        var raw = cboTrainerPin.SelectedItem?.ToString();
+        return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pin)
+            ? pin
+            : DefaultTrainerPin;
     }
 
     private void OnFcBaudChanged()
@@ -464,11 +677,45 @@ public sealed partial class MainForm : Form
         _arduinoBaudRate = selected;
         if (_arduinoConnected && cboArduinoPort.SelectedItem is string port && !string.IsNullOrWhiteSpace(port))
         {
-            SetArduinoStatus($"Arduino connected: {port}@{_arduinoBaudRate}");
+            try
+            {
+                _arduinoTrainerClient.Disconnect();
+                _arduinoTrainerClient.Connect(port, _arduinoBaudRate);
+                _ = _arduinoTrainerClient.SetPin(GetSelectedTrainerPin());
+                var status = _arduinoTrainerClient.Begin();
+                SetArduinoStatus($"Arduino connected: {port}@{_arduinoBaudRate} (pin {status.OutputPin})");
+                CenterArduinoFlightControls();
+            }
+            catch (Exception ex)
+            {
+                _arduinoConnected = false;
+                SetArduinoStatus($"Arduino not connected. Baud set to {_arduinoBaudRate}.");
+                MessageBox.Show(this, ex.Message, "Arduino reconnect failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
         else
         {
             SetArduinoStatus($"Arduino not connected. Baud set to {_arduinoBaudRate}.");
+        }
+        UpdateSerialConnectionUi();
+    }
+
+    private void OnTrainerPinChanged()
+    {
+        if (!_arduinoConnected || !_arduinoTrainerClient.IsConnected)
+        {
+            return;
+        }
+
+        try
+        {
+            var status = _arduinoTrainerClient.SetPin(GetSelectedTrainerPin());
+            SetArduinoStatus($"Arduino connected: {_arduinoTrainerClient.PortName}@{_arduinoBaudRate} (pin {status.OutputPin})");
+            CenterArduinoFlightControls();
+        }
+        catch (Exception ex)
+        {
+            SetArduinoStatus($"Trainer pin change failed: {ex.Message}");
         }
     }
 
@@ -512,7 +759,7 @@ public sealed partial class MainForm : Form
         var fcConnected = _serialPortService.IsConnected;
         var telemetryRunning = _telemetryTimer?.Enabled == true;
         var activePath = GetActiveControlPath();
-        var canRunChannelTests = activePath != ControlPath.None;
+        var canRunChannelTests = _arduinoConnected;
 
         if (!_channelTestRunning)
         {
@@ -535,6 +782,13 @@ public sealed partial class MainForm : Form
         {
             return;
         }
+
+        if (!_arduinoConnected || !_arduinoTrainerClient.IsConnected)
+        {
+            MessageBox.Show(this, "Connect Arduino before running channel tests.", "Channel test unavailable", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
         var activePath = GetActiveControlPath();
         if (activePath == ControlPath.None)
         {
@@ -584,40 +838,84 @@ public sealed partial class MainForm : Form
 
             if (settleMs > 0)
             {
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse(control, control == "throttle" ? 1000 : 1500);
+                }
                 SetChannelTestVisual("Settle", control == "throttle" ? 1000 : 1500, 0.0, 0.0);
                 await Task.Delay(settleMs);
             }
 
             if (control == "throttle")
             {
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse("throttle", throttleUs);
+                }
                 SetChannelTestVisual("Throttle up", throttleUs, 0.0, 0.0);
                 await Task.Delay(800);
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse("throttle", 1000);
+                }
                 SetChannelTestVisual("Throttle low", 1000, 0.0, 0.0);
             }
             else if (control == "roll")
             {
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse("roll", 1700);
+                }
                 SetChannelTestVisual("Roll right", 1700, targetDeg, 0.0);
                 await Task.Delay(650);
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse("roll", 1500);
+                }
                 SetChannelTestVisual("Center baseline", 1500, 0.0, 0.0);
                 if (baselineMs > 0)
                 {
                     await Task.Delay(baselineMs);
                 }
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse("roll", 1300);
+                }
                 SetChannelTestVisual("Roll left", 1300, -targetDeg, 0.0);
                 await Task.Delay(650);
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse("roll", 1500);
+                }
                 SetChannelTestVisual("Center baseline", 1500, 0.0, 0.0);
             }
             else if (control == "pitch")
             {
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse("pitch", 1700);
+                }
                 SetChannelTestVisual("Pitch forward", 1700, 0.0, targetDeg);
                 await Task.Delay(650);
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse("pitch", 1500);
+                }
                 SetChannelTestVisual("Center baseline", 1500, 0.0, 0.0);
                 if (baselineMs > 0)
                 {
                     await Task.Delay(baselineMs);
                 }
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse("pitch", 1300);
+                }
                 SetChannelTestVisual("Pitch back", 1300, 0.0, -targetDeg);
                 await Task.Delay(650);
+                if (activePath == ControlPath.ArduinoTransmitter)
+                {
+                    SetArduinoAxisPulse("pitch", 1500);
+                }
                 SetChannelTestVisual("Center baseline", 1500, 0.0, 0.0);
             }
 
@@ -626,6 +924,10 @@ public sealed partial class MainForm : Form
                 await Task.Delay(baselineMs);
             }
 
+            if (activePath == ControlPath.ArduinoTransmitter)
+            {
+                CenterArduinoFlightControls();
+            }
             SetChannelTestVisual("Idle", control == "throttle" ? 1000 : 1500, 0.0, 0.0);
             lblFCStatus.Text = $"Completed {control} channel test on {channelCode} via {DescribeControlPath(activePath)}.";
         }
@@ -649,6 +951,69 @@ public sealed partial class MainForm : Form
         btnTestRoll.Enabled = enabled;
         btnTestPitch.Enabled = enabled;
         btnTestThrottle.Enabled = enabled;
+    }
+
+    private static string AxisCodeForControl(string control)
+    {
+        return control switch
+        {
+            "roll" => "A",
+            "pitch" => "E",
+            "throttle" => "T",
+            "yaw" => "R",
+            _ => throw new ArgumentOutOfRangeException(nameof(control), $"Unsupported control '{control}'."),
+        };
+    }
+
+    private int ChannelFromAxisCode(string axisCode)
+    {
+        if (string.Equals(GetComboValue(cboCH1, "A"), axisCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return 1;
+        }
+        if (string.Equals(GetComboValue(cboCH2, "E"), axisCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return 2;
+        }
+        if (string.Equals(GetComboValue(cboCH3, "T"), axisCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return 3;
+        }
+        if (string.Equals(GetComboValue(cboCH4, "R"), axisCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return 4;
+        }
+        throw new InvalidOperationException($"No channel mapped to axis '{axisCode}'.");
+    }
+
+    private void SetArduinoAxisPulse(string control, int pulseUs)
+    {
+        if (!_arduinoTrainerClient.IsConnected)
+        {
+            throw new InvalidOperationException("Arduino trainer cable is not connected.");
+        }
+
+        var axisCode = AxisCodeForControl(control);
+        var channel = ChannelFromAxisCode(axisCode);
+        _arduinoTrainerClient.SetChannelPulseUs(channel, pulseUs);
+        SetChannelPulseState(channel, pulseUs);
+    }
+
+    private void CenterArduinoFlightControls()
+    {
+        if (!_arduinoTrainerClient.IsConnected)
+        {
+            return;
+        }
+
+        _arduinoTrainerClient.SetChannelPulseUs(ChannelFromAxisCode("A"), 1500);
+        SetChannelPulseState(ChannelFromAxisCode("A"), 1500);
+        _arduinoTrainerClient.SetChannelPulseUs(ChannelFromAxisCode("E"), 1500);
+        SetChannelPulseState(ChannelFromAxisCode("E"), 1500);
+        _arduinoTrainerClient.SetChannelPulseUs(ChannelFromAxisCode("T"), 1000);
+        SetChannelPulseState(ChannelFromAxisCode("T"), 1000);
+        _arduinoTrainerClient.SetChannelPulseUs(ChannelFromAxisCode("R"), 1500);
+        SetChannelPulseState(ChannelFromAxisCode("R"), 1500);
     }
 
     private void InitializeTelemetry()
@@ -723,7 +1088,7 @@ public sealed partial class MainForm : Form
     private void InitializePidWorkflow()
     {
         lblActiveAxis.Text = "N/A";
-        txtPidRecommendation.Text = "Run Roll or Pitch to generate a recommendation.";
+        txtPidRecommendation.Text = "Tune Roll or Pitch to generate a recommendation.";
         UpdatePidSnapshotPanel(null, null, null, null, null, null);
         cmbManualAxis.Items.Clear();
         cmbManualAxis.Items.AddRange(new object[] { "Roll", "Pitch" });
@@ -745,7 +1110,7 @@ public sealed partial class MainForm : Form
         }
         if (!_serialPortService.IsConnected)
         {
-            MessageBox.Show(this, "Connect FC USB first.", "PID workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Connect FC USB first.", "PID Tuning Workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -763,11 +1128,23 @@ public sealed partial class MainForm : Form
 
         try
         {
-            var before = await SampleAxisNoiseAsync(axis, sampleCount: 14, sampleDelayMs: 70);
-            await RunChannelTestAsync(axis);
-            var after = await SampleAxisNoiseAsync(axis, sampleCount: 14, sampleDelayMs: 70);
+            double score;
+            if (_arduinoConnected)
+            {
+                score = await RunAxisDynamicScoreAsync(
+                    axis,
+                    targetDeg: Math.Max(5.0, (double)nudTargetDeg.Value),
+                    durationSec: 5.0,
+                    throttleUs: (int)nudThrottleUs.Value);
+            }
+            else
+            {
+                var before = await SampleAxisNoiseAsync(axis, sampleCount: 14, sampleDelayMs: 70);
+                await RunChannelTestAsync(axis);
+                var after = await SampleAxisNoiseAsync(axis, sampleCount: 14, sampleDelayMs: 70);
+                score = (before + after) / 2.0;
+            }
 
-            var score = (before + after) / 2.0;
             var recommendation = BuildRecommendation(axis, score);
             _pendingRecommendation = recommendation;
 
@@ -777,7 +1154,7 @@ public sealed partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            lblFCStatus.Text = $"PID workflow failed: {ex.Message}";
+            lblFCStatus.Text = $"PID tuning workflow failed: {ex.Message}";
         }
         finally
         {
@@ -822,6 +1199,174 @@ public sealed partial class MainForm : Form
             $"Recommendation: axis looks stable (score {score:F2}). No PID change required.");
     }
 
+    private async Task<double> RunAxisDynamicScoreAsync(string axis, double targetDeg, double durationSec, int throttleUs)
+    {
+        var baseline = await RecordAxisBaselineRateAsync(axis, Math.Max(0.3, (double)nudBaselineSec.Value));
+        var positive = await CaptureDirectionMetricsAsync(axis, Math.Abs(targetDeg), durationSec, baseline, throttleUs);
+        await Task.Delay(250);
+        var negative = await CaptureDirectionMetricsAsync(axis, -Math.Abs(targetDeg), durationSec, baseline, throttleUs);
+        return (positive.Score + negative.Score) / 2.0;
+    }
+
+    private async Task<double> RecordAxisBaselineRateAsync(string axis, double durationSec)
+    {
+        var previous = _serialPortService.ReadAttitude(2.0);
+        var previousAt = DateTime.UtcNow;
+        var rates = new List<double>();
+        var endAt = DateTime.UtcNow.AddSeconds(durationSec);
+
+        CenterArduinoFlightControls();
+        while (DateTime.UtcNow < endAt)
+        {
+            await Task.Delay(50);
+            var now = DateTime.UtcNow;
+            var attitude = _serialPortService.ReadAttitude(2.0);
+            var dt = Math.Max(0.001, (now - previousAt).TotalSeconds);
+            var rate = axis == "roll"
+                ? (attitude.RollDeg - previous.RollDeg) / dt
+                : (attitude.PitchDeg - previous.PitchDeg) / dt;
+            rates.Add(rate);
+            previous = attitude;
+            previousAt = now;
+        }
+
+        return rates.Count == 0 ? 0.0 : rates.Average();
+    }
+
+    private async Task<DirectionMetrics> CaptureDirectionMetricsAsync(string axis, double commandDeg, double durationSec, double baselineRate, int throttleUs)
+    {
+        var target = Math.Max(1.0, Math.Abs(commandDeg));
+        var start = DateTime.UtcNow;
+        var stopAt = start.AddSeconds(durationSec);
+        var previous = _serialPortService.ReadAttitude(2.0);
+        var previousAt = DateTime.UtcNow;
+        var referenceAngle = axis == "roll" ? previous.RollDeg : previous.PitchDeg;
+        var movementRates = new List<double>();
+        var angleDeltas = new List<double>();
+        var timeData = new List<double>();
+        var commandPulse = ToPulseFromCommandDeg(commandDeg);
+        var commandActive = false;
+        var reachedTarget = false;
+
+        if (_arduinoConnected)
+        {
+            SetArduinoAxisPulse("throttle", throttleUs);
+            SetArduinoAxisPulse(axis, commandPulse);
+            commandActive = true;
+        }
+
+        try
+        {
+            while (DateTime.UtcNow < stopAt)
+            {
+                await Task.Delay(50);
+                var now = DateTime.UtcNow;
+                var attitude = _serialPortService.ReadAttitude(2.0);
+                var dt = Math.Max(0.001, (now - previousAt).TotalSeconds);
+                var currentAngle = axis == "roll" ? attitude.RollDeg : attitude.PitchDeg;
+                var previousAngle = axis == "roll" ? previous.RollDeg : previous.PitchDeg;
+                var rawRate = (currentAngle - previousAngle) / dt;
+                var movement = rawRate - baselineRate;
+                var angleDelta = currentAngle - referenceAngle;
+                var elapsed = (now - start).TotalSeconds;
+
+                movementRates.Add(movement);
+                angleDeltas.Add(angleDelta);
+                timeData.Add(elapsed);
+
+                if (commandActive && Math.Abs(angleDelta) >= target)
+                {
+                    CenterArduinoFlightControls();
+                    commandActive = false;
+                    reachedTarget = true;
+                }
+
+                previous = attitude;
+                previousAt = now;
+            }
+        }
+        finally
+        {
+            if (_arduinoConnected)
+            {
+                CenterArduinoFlightControls();
+            }
+        }
+
+        if (!reachedTarget)
+        {
+            lblFCStatus.Text = $"{axis} target not reached within {durationSec:F1}s; forced neutral.";
+        }
+
+        var score = ComputeDirectionScore(movementRates, angleDeltas, target, durationSec);
+        return new DirectionMetrics(score);
+    }
+
+    private static int ToPulseFromCommandDeg(double commandDeg)
+    {
+        var clamped = Math.Max(-MaxCommandDeg, Math.Min(MaxCommandDeg, commandDeg));
+        var pulse = 1500.0 + (clamped / MaxCommandDeg) * 500.0;
+        return (int)Math.Round(pulse, MidpointRounding.AwayFromZero);
+    }
+
+    private static double ComputeDirectionScore(IReadOnlyList<double> movementRates, IReadOnlyList<double> angleDeltas, double targetDeg, double durationSec)
+    {
+        if (movementRates.Count == 0 || angleDeltas.Count == 0)
+        {
+            return 999.0;
+        }
+
+        var oscillations = 0;
+        var prevSign = 0;
+        foreach (var value in movementRates)
+        {
+            var sign = value > 1.0 ? 1 : value < -1.0 ? -1 : 0;
+            if (sign != 0 && prevSign != 0 && sign != prevSign)
+            {
+                oscillations++;
+            }
+            if (sign != 0)
+            {
+                prevSign = sign;
+            }
+        }
+
+        var maxAbsDelta = angleDeltas.Select(Math.Abs).DefaultIfEmpty(0.0).Max();
+        var overshootRatio = targetDeg <= 0.001 ? 1.0 : maxAbsDelta / targetDeg;
+        var tailStart = Math.Max(0, movementRates.Count - Math.Max(3, movementRates.Count / 4));
+        var steadyStateError = movementRates.Skip(tailStart).Select(Math.Abs).DefaultIfEmpty(0.0).Average();
+        var settleTolerance = Math.Max(targetDeg * 0.05, 1.0);
+        var settlingTime = durationSec;
+        for (var i = 0; i < movementRates.Count; i++)
+        {
+            if (Math.Abs(movementRates[i]) > settleTolerance)
+            {
+                continue;
+            }
+
+            var remainingStable = true;
+            for (var j = i; j < movementRates.Count; j++)
+            {
+                if (Math.Abs(movementRates[j]) > settleTolerance)
+                {
+                    remainingStable = false;
+                    break;
+                }
+            }
+            if (remainingStable)
+            {
+                settlingTime = durationSec * i / movementRates.Count;
+                break;
+            }
+        }
+
+        return
+            oscillations * 2.0
+            + Math.Max(0.0, overshootRatio - 1.0) * 2.0
+            + steadyStateError / settleTolerance
+            + (settlingTime / Math.Max(durationSec, 0.001));
+    }
+
     private void AppendTuningRun(string axis, int iteration, double score, PidAdjustmentRecommendation recommendation)
     {
         var runNumber = _tuningRuns.Count + 1;
@@ -858,12 +1403,12 @@ public sealed partial class MainForm : Form
     {
         if (_pendingRecommendation is null || _pendingRecommendation.Points <= 0)
         {
-            MessageBox.Show(this, "No pending PID adjustment to apply.", "PID workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "No pending PID adjustment to apply.", "PID Tuning Workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         if (!_serialPortService.IsConnected)
         {
-            MessageBox.Show(this, "Connect FC USB first.", "PID workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Connect FC USB first.", "PID Tuning Workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -1027,7 +1572,7 @@ public sealed partial class MainForm : Form
     {
         if (string.IsNullOrWhiteSpace(_activeAxis))
         {
-            MessageBox.Show(this, "Run Roll or Pitch first.", "PID workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Tune Roll or Pitch first.", "PID Tuning Workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         _ = RunPidTuningRoundAsync(_activeAxis, resetAxis: false);
@@ -1037,7 +1582,7 @@ public sealed partial class MainForm : Form
     {
         _activeAxis = null;
         lblActiveAxis.Text = "N/A";
-        txtPidRecommendation.Text = "Axis tuning stopped. Run Roll or Pitch to continue.";
+        txtPidRecommendation.Text = "Axis tuning stopped. Tune Roll or Pitch to continue.";
         lblFCStatus.Text = "Axis tuning finished.";
     }
 
@@ -1090,7 +1635,7 @@ public sealed partial class MainForm : Form
     {
         _telemetryTimer?.Stop();
         _telemetryTimer?.Dispose();
-        _arduinoConnected = false;
+        DisconnectArduinoUsb();
         _serialPortService.Dispose();
 
         // Do not persist layout on exit; always use designer layout on next startup.
@@ -1128,6 +1673,12 @@ public sealed partial class MainForm : Form
     private void btnSaveFcPid_Click(object sender, EventArgs e) => SaveFcPidValues();
     private void pnlScoreChart_Paint(object sender, PaintEventArgs e) => DrawScoreChart(e.Graphics, pnlScoreChart.ClientRectangle);
 
+    private void lblActiveAxisTitle_Click(object sender, EventArgs e)
+    {
+
+    }
+
     private sealed record TuningRunRecord(int RunNumber, string Axis, int Iteration, double Score, string Recommendation);
     private sealed record PidAdjustmentRecommendation(string Axis, string Gain, string Direction, int Points, string Message);
+    private sealed record DirectionMetrics(double Score);
 }

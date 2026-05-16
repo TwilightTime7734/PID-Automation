@@ -22,11 +22,13 @@ partial class MainForm
         rootLayout = new Panel();
         grpPortingArea = new Panel();
         grpPidWorkflow = new GroupBox();
-        pidWorkflowLayout = new Panel();
         pidButtonLayout = new Panel();
         btnTuneRoll = new Button();
+        lblActiveAxis = new Label();
+        lblActiveAxisTitle = new Label();
         btnTunePitch = new Button();
         btnRetestAxis = new Button();
+        lblPidValuesTitle = new Label();
         btnFinishAxis = new Button();
         btnApplyRecommendedPid = new Button();
         cmbManualAxis = new ComboBox();
@@ -36,9 +38,16 @@ partial class MainForm
         btnManualPidPlus = new Button();
         btnReadFcPid = new Button();
         btnSaveFcPid = new Button();
-        lblActiveAxisTitle = new Label();
-        lblActiveAxis = new Label();
-        lblPidValuesTitle = new Label();
+        pidWorkflowLayout = new Panel();
+        channelVisualLayout = new Panel();
+        lblChannelVisualTitle = new Label();
+        lblChannelVisual = new Label();
+        lblChannelValueTitle = new Label();
+        lblChannelValue = new Label();
+        lblRollAngleTitle = new Label();
+        lblRollAngle = new Label();
+        lblPitchAngleTitle = new Label();
+        lblPitchAngle = new Label();
         grpTuningProgress = new GroupBox();
         tuningProgressLayout = new Panel();
         pnlScoreChart = new Panel();
@@ -60,15 +69,6 @@ partial class MainForm
         colAxis = new ColumnHeader();
         colScore = new ColumnHeader();
         colDecision = new ColumnHeader();
-        channelVisualLayout = new Panel();
-        lblChannelVisualTitle = new Label();
-        lblChannelVisual = new Label();
-        lblChannelValueTitle = new Label();
-        lblChannelValue = new Label();
-        lblRollAngleTitle = new Label();
-        lblRollAngle = new Label();
-        lblPitchAngleTitle = new Label();
-        lblPitchAngle = new Label();
         txtPidValues = new TextBox();
         txtPidRecommendation = new TextBox();
         topLayout = new Panel();
@@ -84,6 +84,8 @@ partial class MainForm
         lblArduinoPort = new Label();
         cboArduinoPort = new ComboBox();
         cboArduinoBaud = new ComboBox();
+        lblTrainerPin = new Label();
+        cboTrainerPin = new ComboBox();
         btnArduinoConnect = new Button();
         btnArduinoDisconnect = new Button();
         lblFCStatus = new Label();
@@ -107,6 +109,11 @@ partial class MainForm
         btnTestRoll = new Button();
         btnTestPitch = new Button();
         btnTestThrottle = new Button();
+        pnlSticks = new Panel();
+        pnlLeftStick = new Panel();
+        pnlLeftStickIndicator = new Panel();
+        pnlRightStick = new Panel();
+        pnlRightStickIndicator = new Panel();
         channelInputsLayout = new Panel();
         lblTargetDeg = new Label();
         lblSettleSec = new Label();
@@ -121,15 +128,15 @@ partial class MainForm
         rootLayout.SuspendLayout();
         grpPortingArea.SuspendLayout();
         grpPidWorkflow.SuspendLayout();
-        pidWorkflowLayout.SuspendLayout();
         pidButtonLayout.SuspendLayout();
+        channelVisualLayout.SuspendLayout();
         grpTuningProgress.SuspendLayout();
         tuningProgressLayout.SuspendLayout();
         pnlScoreChart.SuspendLayout();
+        grpTelemetry.SuspendLayout();
         telemetryLayout.SuspendLayout();
         telemetryButtonLayout.SuspendLayout();
         telemetryValueLayout.SuspendLayout();
-        channelVisualLayout.SuspendLayout();
         topLayout.SuspendLayout();
         grpUsb.SuspendLayout();
         usbLayout.SuspendLayout();
@@ -138,6 +145,9 @@ partial class MainForm
         grpChannelTest.SuspendLayout();
         channelTestLayout.SuspendLayout();
         channelActionLayout.SuspendLayout();
+        pnlSticks.SuspendLayout();
+        pnlLeftStick.SuspendLayout();
+        pnlRightStick.SuspendLayout();
         channelInputsLayout.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)nudSettleSec).BeginInit();
         ((System.ComponentModel.ISupportInitialize)nudBaselineSec).BeginInit();
@@ -147,54 +157,48 @@ partial class MainForm
         // 
         // rootLayout
         // 
-        rootLayout.Controls.Add(topLayout);
-        rootLayout.Controls.Add(pidButtonLayout);
         rootLayout.Controls.Add(grpPortingArea);
+        rootLayout.Controls.Add(topLayout);
         rootLayout.Dock = DockStyle.Fill;
         rootLayout.Location = new Point(0, 0);
         rootLayout.Name = "rootLayout";
         rootLayout.Padding = new Padding(10);
-        rootLayout.Size = new Size(1389, 1077);
+        rootLayout.Size = new Size(959, 534);
         rootLayout.TabIndex = 0;
         // 
         // grpPortingArea
         // 
-        grpPortingArea.Anchor = AnchorStyles.None;
         grpPortingArea.Controls.Add(grpPidWorkflow);
         grpPortingArea.Controls.Add(grpTuningProgress);
-        grpPortingArea.Location = new Point(13, 385);
+        grpPortingArea.Dock = DockStyle.Fill;
+        grpPortingArea.Location = new Point(10, 191);
         grpPortingArea.Name = "grpPortingArea";
         grpPortingArea.Padding = new Padding(10);
-        grpPortingArea.Size = new Size(1363, 552);
+        grpPortingArea.Size = new Size(939, 333);
         grpPortingArea.TabIndex = 1;
         // 
         // grpPidWorkflow
         // 
+        grpPidWorkflow.Controls.Add(pidButtonLayout);
         grpPidWorkflow.Controls.Add(pidWorkflowLayout);
+        grpPidWorkflow.Controls.Add(channelVisualLayout);
         grpPidWorkflow.Dock = DockStyle.Top;
         grpPidWorkflow.Location = new Point(10, 10);
         grpPidWorkflow.Name = "grpPidWorkflow";
         grpPidWorkflow.Padding = new Padding(10);
-        grpPidWorkflow.Size = new Size(1343, 190);
+        grpPidWorkflow.Size = new Size(919, 170);
         grpPidWorkflow.TabIndex = 2;
         grpPidWorkflow.TabStop = false;
         grpPidWorkflow.Text = "PID Tuning Workflow";
         // 
-        // pidWorkflowLayout
-        // 
-        pidWorkflowLayout.Controls.Add(lblActiveAxisTitle);
-        pidWorkflowLayout.Controls.Add(lblActiveAxis);
-        pidWorkflowLayout.Controls.Add(lblPidValuesTitle);
-        pidWorkflowLayout.Location = new Point(10, 26);
-        pidWorkflowLayout.Name = "pidWorkflowLayout";
-        pidWorkflowLayout.Size = new Size(1222, 133);
-        pidWorkflowLayout.TabIndex = 0;
-        // 
         // pidButtonLayout
         // 
         pidButtonLayout.Controls.Add(btnTuneRoll);
+        pidButtonLayout.Controls.Add(lblActiveAxis);
+        pidButtonLayout.Controls.Add(lblActiveAxisTitle);
         pidButtonLayout.Controls.Add(btnTunePitch);
         pidButtonLayout.Controls.Add(btnRetestAxis);
+        pidButtonLayout.Controls.Add(lblPidValuesTitle);
         pidButtonLayout.Controls.Add(btnFinishAxis);
         pidButtonLayout.Controls.Add(btnApplyRecommendedPid);
         pidButtonLayout.Controls.Add(cmbManualAxis);
@@ -204,9 +208,9 @@ partial class MainForm
         pidButtonLayout.Controls.Add(btnManualPidPlus);
         pidButtonLayout.Controls.Add(btnReadFcPid);
         pidButtonLayout.Controls.Add(btnSaveFcPid);
-        pidButtonLayout.Location = new Point(746, 262);
+        pidButtonLayout.Location = new Point(170, 164);
         pidButtonLayout.Name = "pidButtonLayout";
-        pidButtonLayout.Size = new Size(509, 127);
+        pidButtonLayout.Size = new Size(661, 135);
         pidButtonLayout.TabIndex = 0;
         // 
         // btnTuneRoll
@@ -215,9 +219,28 @@ partial class MainForm
         btnTuneRoll.Name = "btnTuneRoll";
         btnTuneRoll.Size = new Size(90, 29);
         btnTuneRoll.TabIndex = 0;
-        btnTuneRoll.Text = "Run Roll";
+        btnTuneRoll.Text = "Tune Roll";
         btnTuneRoll.UseVisualStyleBackColor = true;
         btnTuneRoll.Click += btnTuneRoll_Click;
+        // 
+        // lblActiveAxis
+        // 
+        lblActiveAxis.Anchor = AnchorStyles.Left;
+        lblActiveAxis.Location = new Point(422, 20);
+        lblActiveAxis.Name = "lblActiveAxis";
+        lblActiveAxis.Size = new Size(29, 15);
+        lblActiveAxis.TabIndex = 2;
+        lblActiveAxis.Text = "N/A";
+        // 
+        // lblActiveAxisTitle
+        // 
+        lblActiveAxisTitle.Anchor = AnchorStyles.Left;
+        lblActiveAxisTitle.Location = new Point(552, 31);
+        lblActiveAxisTitle.Name = "lblActiveAxisTitle";
+        lblActiveAxisTitle.Size = new Size(65, 15);
+        lblActiveAxisTitle.TabIndex = 1;
+        lblActiveAxisTitle.Text = "Active Axis";
+        lblActiveAxisTitle.Click += lblActiveAxisTitle_Click;
         // 
         // btnTunePitch
         // 
@@ -225,7 +248,7 @@ partial class MainForm
         btnTunePitch.Name = "btnTunePitch";
         btnTunePitch.Size = new Size(90, 29);
         btnTunePitch.TabIndex = 1;
-        btnTunePitch.Text = "Run Pitch";
+        btnTunePitch.Text = "Tune Pitch";
         btnTunePitch.UseVisualStyleBackColor = true;
         btnTunePitch.Click += btnTunePitch_Click;
         // 
@@ -235,9 +258,18 @@ partial class MainForm
         btnRetestAxis.Name = "btnRetestAxis";
         btnRetestAxis.Size = new Size(90, 29);
         btnRetestAxis.TabIndex = 2;
-        btnRetestAxis.Text = "Re-test";
+        btnRetestAxis.Text = "Retest Axis";
         btnRetestAxis.UseVisualStyleBackColor = true;
         btnRetestAxis.Click += btnRetestAxis_Click;
+        // 
+        // lblPidValuesTitle
+        // 
+        lblPidValuesTitle.Anchor = AnchorStyles.Left;
+        lblPidValuesTitle.Location = new Point(446, 97);
+        lblPidValuesTitle.Name = "lblPidValuesTitle";
+        lblPidValuesTitle.Size = new Size(94, 15);
+        lblPidValuesTitle.TabIndex = 4;
+        lblPidValuesTitle.Text = "FC PID Snapshot";
         // 
         // btnFinishAxis
         // 
@@ -245,7 +277,7 @@ partial class MainForm
         btnFinishAxis.Name = "btnFinishAxis";
         btnFinishAxis.Size = new Size(90, 29);
         btnFinishAxis.TabIndex = 3;
-        btnFinishAxis.Text = "Finish Axis";
+        btnFinishAxis.Text = "Complete Axis";
         btnFinishAxis.UseVisualStyleBackColor = true;
         btnFinishAxis.Click += btnFinishAxis_Click;
         // 
@@ -255,7 +287,7 @@ partial class MainForm
         btnApplyRecommendedPid.Name = "btnApplyRecommendedPid";
         btnApplyRecommendedPid.Size = new Size(160, 29);
         btnApplyRecommendedPid.TabIndex = 4;
-        btnApplyRecommendedPid.Text = "Apply Recommended PID";
+        btnApplyRecommendedPid.Text = "Apply Suggested PID";
         btnApplyRecommendedPid.UseVisualStyleBackColor = true;
         btnApplyRecommendedPid.Click += btnApplyRecommendedPid_Click;
         // 
@@ -292,7 +324,7 @@ partial class MainForm
         btnManualPidMinus.Name = "btnManualPidMinus";
         btnManualPidMinus.Size = new Size(58, 28);
         btnManualPidMinus.TabIndex = 8;
-        btnManualPidMinus.Text = "PID -";
+        btnManualPidMinus.Text = "Decrease";
         btnManualPidMinus.UseVisualStyleBackColor = true;
         btnManualPidMinus.Click += btnManualPidMinus_Click;
         // 
@@ -302,7 +334,7 @@ partial class MainForm
         btnManualPidPlus.Name = "btnManualPidPlus";
         btnManualPidPlus.Size = new Size(58, 28);
         btnManualPidPlus.TabIndex = 9;
-        btnManualPidPlus.Text = "PID +";
+        btnManualPidPlus.Text = "Increase";
         btnManualPidPlus.UseVisualStyleBackColor = true;
         btnManualPidPlus.Click += btnManualPidPlus_Click;
         // 
@@ -312,7 +344,7 @@ partial class MainForm
         btnReadFcPid.Name = "btnReadFcPid";
         btnReadFcPid.Size = new Size(75, 28);
         btnReadFcPid.TabIndex = 10;
-        btnReadFcPid.Text = "Read FC";
+        btnReadFcPid.Text = "Read FC PID";
         btnReadFcPid.UseVisualStyleBackColor = true;
         btnReadFcPid.Click += btnReadFcPid_Click;
         // 
@@ -322,36 +354,105 @@ partial class MainForm
         btnSaveFcPid.Name = "btnSaveFcPid";
         btnSaveFcPid.Size = new Size(75, 28);
         btnSaveFcPid.TabIndex = 11;
-        btnSaveFcPid.Text = "Save FC";
+        btnSaveFcPid.Text = "Save FC PID";
         btnSaveFcPid.UseVisualStyleBackColor = true;
         btnSaveFcPid.Click += btnSaveFcPid_Click;
         // 
-        // lblActiveAxisTitle
+        // pidWorkflowLayout
         // 
-        lblActiveAxisTitle.Anchor = AnchorStyles.Left;
-        lblActiveAxisTitle.Location = new Point(858, 21);
-        lblActiveAxisTitle.Name = "lblActiveAxisTitle";
-        lblActiveAxisTitle.Size = new Size(65, 15);
-        lblActiveAxisTitle.TabIndex = 1;
-        lblActiveAxisTitle.Text = "Active Axis";
+        pidWorkflowLayout.Dock = DockStyle.Fill;
+        pidWorkflowLayout.Location = new Point(10, 26);
+        pidWorkflowLayout.Name = "pidWorkflowLayout";
+        pidWorkflowLayout.Size = new Size(899, 134);
+        pidWorkflowLayout.TabIndex = 0;
         // 
-        // lblActiveAxis
+        // channelVisualLayout
         // 
-        lblActiveAxis.Anchor = AnchorStyles.Left;
-        lblActiveAxis.Location = new Point(858, 58);
-        lblActiveAxis.Name = "lblActiveAxis";
-        lblActiveAxis.Size = new Size(29, 15);
-        lblActiveAxis.TabIndex = 2;
-        lblActiveAxis.Text = "N/A";
+        channelVisualLayout.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        channelVisualLayout.Controls.Add(lblChannelVisualTitle);
+        channelVisualLayout.Controls.Add(lblChannelVisual);
+        channelVisualLayout.Controls.Add(lblChannelValueTitle);
+        channelVisualLayout.Controls.Add(lblChannelValue);
+        channelVisualLayout.Controls.Add(lblRollAngleTitle);
+        channelVisualLayout.Controls.Add(lblRollAngle);
+        channelVisualLayout.Controls.Add(lblPitchAngleTitle);
+        channelVisualLayout.Controls.Add(lblPitchAngle);
+        channelVisualLayout.Location = new Point(635, 26);
+        channelVisualLayout.Name = "channelVisualLayout";
+        channelVisualLayout.Size = new Size(274, 128);
+        channelVisualLayout.TabIndex = 1;
         // 
-        // lblPidValuesTitle
+        // lblChannelVisualTitle
         // 
-        lblPidValuesTitle.Anchor = AnchorStyles.Left;
-        lblPidValuesTitle.Location = new Point(858, 73);
-        lblPidValuesTitle.Name = "lblPidValuesTitle";
-        lblPidValuesTitle.Size = new Size(94, 15);
-        lblPidValuesTitle.TabIndex = 4;
-        lblPidValuesTitle.Text = "FC PID Snapshot";
+        lblChannelVisualTitle.Anchor = AnchorStyles.Left;
+        lblChannelVisualTitle.Location = new Point(8, 10);
+        lblChannelVisualTitle.Name = "lblChannelVisualTitle";
+        lblChannelVisualTitle.Size = new Size(42, 15);
+        lblChannelVisualTitle.TabIndex = 0;
+        lblChannelVisualTitle.Text = "Status:";
+        // 
+        // lblChannelVisual
+        // 
+        lblChannelVisual.Anchor = AnchorStyles.Left;
+        lblChannelVisual.Location = new Point(56, 10);
+        lblChannelVisual.Name = "lblChannelVisual";
+        lblChannelVisual.Size = new Size(26, 15);
+        lblChannelVisual.TabIndex = 1;
+        lblChannelVisual.Text = "Idle";
+        // 
+        // lblChannelValueTitle
+        // 
+        lblChannelValueTitle.Anchor = AnchorStyles.Left;
+        lblChannelValueTitle.Location = new Point(8, 34);
+        lblChannelValueTitle.Name = "lblChannelValueTitle";
+        lblChannelValueTitle.Size = new Size(38, 15);
+        lblChannelValueTitle.TabIndex = 2;
+        lblChannelValueTitle.Text = "Pulse:";
+        // 
+        // lblChannelValue
+        // 
+        lblChannelValue.Anchor = AnchorStyles.Left;
+        lblChannelValue.Location = new Point(56, 34);
+        lblChannelValue.Name = "lblChannelValue";
+        lblChannelValue.Size = new Size(46, 15);
+        lblChannelValue.TabIndex = 3;
+        lblChannelValue.Text = "1500 us";
+        // 
+        // lblRollAngleTitle
+        // 
+        lblRollAngleTitle.Anchor = AnchorStyles.Left;
+        lblRollAngleTitle.Location = new Point(8, 58);
+        lblRollAngleTitle.Name = "lblRollAngleTitle";
+        lblRollAngleTitle.Size = new Size(62, 15);
+        lblRollAngleTitle.TabIndex = 4;
+        lblRollAngleTitle.Text = "Roll angle:";
+        // 
+        // lblRollAngle
+        // 
+        lblRollAngle.Anchor = AnchorStyles.Left;
+        lblRollAngle.Location = new Point(76, 58);
+        lblRollAngle.Name = "lblRollAngle";
+        lblRollAngle.Size = new Size(27, 15);
+        lblRollAngle.TabIndex = 5;
+        lblRollAngle.Text = "0.0°";
+        // 
+        // lblPitchAngleTitle
+        // 
+        lblPitchAngleTitle.Anchor = AnchorStyles.Left;
+        lblPitchAngleTitle.Location = new Point(8, 82);
+        lblPitchAngleTitle.Name = "lblPitchAngleTitle";
+        lblPitchAngleTitle.Size = new Size(69, 15);
+        lblPitchAngleTitle.TabIndex = 6;
+        lblPitchAngleTitle.Text = "Pitch angle:";
+        // 
+        // lblPitchAngle
+        // 
+        lblPitchAngle.Anchor = AnchorStyles.Left;
+        lblPitchAngle.Location = new Point(76, 82);
+        lblPitchAngle.Name = "lblPitchAngle";
+        lblPitchAngle.Size = new Size(27, 15);
+        lblPitchAngle.TabIndex = 7;
+        lblPitchAngle.Text = "0.0°";
         // 
         // grpTuningProgress
         // 
@@ -360,7 +461,7 @@ partial class MainForm
         grpTuningProgress.Location = new Point(10, 10);
         grpTuningProgress.Name = "grpTuningProgress";
         grpTuningProgress.Padding = new Padding(10);
-        grpTuningProgress.Size = new Size(1343, 532);
+        grpTuningProgress.Size = new Size(919, 313);
         grpTuningProgress.TabIndex = 3;
         grpTuningProgress.TabStop = false;
         grpTuningProgress.Text = "Tuning Progression Charts and Recommendations";
@@ -371,33 +472,31 @@ partial class MainForm
         tuningProgressLayout.Dock = DockStyle.Fill;
         tuningProgressLayout.Location = new Point(10, 26);
         tuningProgressLayout.Name = "tuningProgressLayout";
-        tuningProgressLayout.Size = new Size(1323, 496);
+        tuningProgressLayout.Size = new Size(899, 277);
         tuningProgressLayout.TabIndex = 0;
         // 
         // pnlScoreChart
         // 
-        pnlScoreChart.Anchor = AnchorStyles.None;
         pnlScoreChart.BackColor = Color.White;
         pnlScoreChart.BorderStyle = BorderStyle.FixedSingle;
         pnlScoreChart.Controls.Add(grpTelemetry);
-        pnlScoreChart.Controls.Add(telemetryLayout);
         pnlScoreChart.Controls.Add(lvTuningRuns);
-        pnlScoreChart.Controls.Add(channelVisualLayout);
         pnlScoreChart.Controls.Add(txtPidValues);
         pnlScoreChart.Controls.Add(txtPidRecommendation);
-        pnlScoreChart.Location = new Point(211, 3);
+        pnlScoreChart.Dock = DockStyle.Fill;
+        pnlScoreChart.Location = new Point(0, 0);
         pnlScoreChart.Name = "pnlScoreChart";
-        pnlScoreChart.Size = new Size(892, 490);
+        pnlScoreChart.Size = new Size(899, 277);
         pnlScoreChart.TabIndex = 0;
         pnlScoreChart.Paint += pnlScoreChart_Paint;
         // 
         // grpTelemetry
         // 
-        grpTelemetry.Anchor = AnchorStyles.None;
-        grpTelemetry.Location = new Point(47, 155);
+        grpTelemetry.Controls.Add(telemetryLayout);
+        grpTelemetry.Location = new Point(8, 8);
         grpTelemetry.Name = "grpTelemetry";
         grpTelemetry.Padding = new Padding(10);
-        grpTelemetry.Size = new Size(385, 81);
+        grpTelemetry.Size = new Size(417, 130);
         grpTelemetry.TabIndex = 1;
         grpTelemetry.TabStop = false;
         grpTelemetry.Text = "Telemetry";
@@ -406,9 +505,9 @@ partial class MainForm
         // 
         telemetryLayout.Controls.Add(telemetryButtonLayout);
         telemetryLayout.Controls.Add(telemetryValueLayout);
-        telemetryLayout.Location = new Point(15, 440);
+        telemetryLayout.Location = new Point(10, 26);
         telemetryLayout.Name = "telemetryLayout";
-        telemetryLayout.Size = new Size(269, 105);
+        telemetryLayout.Size = new Size(397, 94);
         telemetryLayout.TabIndex = 0;
         // 
         // telemetryButtonLayout
@@ -418,7 +517,7 @@ partial class MainForm
         telemetryButtonLayout.Controls.Add(btnTelemetrySnapshot);
         telemetryButtonLayout.Location = new Point(3, 3);
         telemetryButtonLayout.Name = "telemetryButtonLayout";
-        telemetryButtonLayout.Size = new Size(263, 24);
+        telemetryButtonLayout.Size = new Size(389, 32);
         telemetryButtonLayout.TabIndex = 0;
         // 
         // btnTelemetryStart
@@ -444,7 +543,7 @@ partial class MainForm
         // 
         // btnTelemetrySnapshot
         // 
-        btnTelemetrySnapshot.Location = new Point(3, 38);
+        btnTelemetrySnapshot.Location = new Point(211, 3);
         btnTelemetrySnapshot.Name = "btnTelemetrySnapshot";
         btnTelemetrySnapshot.Size = new Size(98, 29);
         btnTelemetrySnapshot.TabIndex = 2;
@@ -460,15 +559,15 @@ partial class MainForm
         telemetryValueLayout.Controls.Add(lblTelemetryPitch);
         telemetryValueLayout.Controls.Add(lblTelemetryYawTitle);
         telemetryValueLayout.Controls.Add(lblTelemetryYaw);
-        telemetryValueLayout.Location = new Point(3, 33);
+        telemetryValueLayout.Location = new Point(3, 41);
         telemetryValueLayout.Name = "telemetryValueLayout";
-        telemetryValueLayout.Size = new Size(263, 58);
+        telemetryValueLayout.Size = new Size(389, 25);
         telemetryValueLayout.TabIndex = 1;
         // 
         // lblTelemetryRollTitle
         // 
         lblTelemetryRollTitle.Anchor = AnchorStyles.Left;
-        lblTelemetryRollTitle.Location = new Point(3, 42);
+        lblTelemetryRollTitle.Location = new Point(3, 5);
         lblTelemetryRollTitle.Name = "lblTelemetryRollTitle";
         lblTelemetryRollTitle.Size = new Size(30, 15);
         lblTelemetryRollTitle.TabIndex = 0;
@@ -477,7 +576,7 @@ partial class MainForm
         // lblTelemetryRoll
         // 
         lblTelemetryRoll.Anchor = AnchorStyles.Left;
-        lblTelemetryRoll.Location = new Point(123, 42);
+        lblTelemetryRoll.Location = new Point(38, 5);
         lblTelemetryRoll.Name = "lblTelemetryRoll";
         lblTelemetryRoll.Size = new Size(48, 15);
         lblTelemetryRoll.TabIndex = 1;
@@ -486,7 +585,7 @@ partial class MainForm
         // lblTelemetryPitchTitle
         // 
         lblTelemetryPitchTitle.Anchor = AnchorStyles.Left;
-        lblTelemetryPitchTitle.Location = new Point(243, 42);
+        lblTelemetryPitchTitle.Location = new Point(128, 5);
         lblTelemetryPitchTitle.Name = "lblTelemetryPitchTitle";
         lblTelemetryPitchTitle.Size = new Size(37, 15);
         lblTelemetryPitchTitle.TabIndex = 2;
@@ -495,7 +594,7 @@ partial class MainForm
         // lblTelemetryPitch
         // 
         lblTelemetryPitch.Anchor = AnchorStyles.Left;
-        lblTelemetryPitch.Location = new Point(363, 42);
+        lblTelemetryPitch.Location = new Point(166, 5);
         lblTelemetryPitch.Name = "lblTelemetryPitch";
         lblTelemetryPitch.Size = new Size(48, 15);
         lblTelemetryPitch.TabIndex = 3;
@@ -504,7 +603,7 @@ partial class MainForm
         // lblTelemetryYawTitle
         // 
         lblTelemetryYawTitle.Anchor = AnchorStyles.Left;
-        lblTelemetryYawTitle.Location = new Point(483, 42);
+        lblTelemetryYawTitle.Location = new Point(256, 5);
         lblTelemetryYawTitle.Name = "lblTelemetryYawTitle";
         lblTelemetryYawTitle.Size = new Size(31, 15);
         lblTelemetryYawTitle.TabIndex = 4;
@@ -513,7 +612,7 @@ partial class MainForm
         // lblTelemetryYaw
         // 
         lblTelemetryYaw.Anchor = AnchorStyles.Left;
-        lblTelemetryYaw.Location = new Point(603, 42);
+        lblTelemetryYaw.Location = new Point(291, 5);
         lblTelemetryYaw.Name = "lblTelemetryYaw";
         lblTelemetryYaw.Size = new Size(48, 15);
         lblTelemetryYaw.TabIndex = 5;
@@ -521,12 +620,12 @@ partial class MainForm
         // 
         // lvTuningRuns
         // 
-        lvTuningRuns.Anchor = AnchorStyles.None;
+        lvTuningRuns.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         lvTuningRuns.Columns.AddRange(new ColumnHeader[] { colRun, colAxis, colScore, colDecision });
         lvTuningRuns.FullRowSelect = true;
-        lvTuningRuns.Location = new Point(59, 260);
+        lvTuningRuns.Location = new Point(8, 144);
         lvTuningRuns.Name = "lvTuningRuns";
-        lvTuningRuns.Size = new Size(294, 99);
+        lvTuningRuns.Size = new Size(576, 124);
         lvTuningRuns.TabIndex = 1;
         lvTuningRuns.UseCompatibleStateImageBehavior = false;
         lvTuningRuns.View = View.Details;
@@ -551,133 +650,48 @@ partial class MainForm
         colDecision.Text = "Recommendation";
         colDecision.Width = 430;
         // 
-        // channelVisualLayout
-        // 
-        channelVisualLayout.Anchor = AnchorStyles.None;
-        channelVisualLayout.Controls.Add(lblChannelVisualTitle);
-        channelVisualLayout.Controls.Add(lblChannelVisual);
-        channelVisualLayout.Controls.Add(lblChannelValueTitle);
-        channelVisualLayout.Controls.Add(lblChannelValue);
-        channelVisualLayout.Controls.Add(lblRollAngleTitle);
-        channelVisualLayout.Controls.Add(lblRollAngle);
-        channelVisualLayout.Controls.Add(lblPitchAngleTitle);
-        channelVisualLayout.Controls.Add(lblPitchAngle);
-        channelVisualLayout.Location = new Point(385, 324);
-        channelVisualLayout.Name = "channelVisualLayout";
-        channelVisualLayout.Size = new Size(416, 69);
-        channelVisualLayout.TabIndex = 1;
-        // 
-        // lblChannelVisualTitle
-        // 
-        lblChannelVisualTitle.Anchor = AnchorStyles.Left;
-        lblChannelVisualTitle.Location = new Point(3, 42);
-        lblChannelVisualTitle.Name = "lblChannelVisualTitle";
-        lblChannelVisualTitle.Size = new Size(42, 15);
-        lblChannelVisualTitle.TabIndex = 0;
-        lblChannelVisualTitle.Text = "Status:";
-        // 
-        // lblChannelVisual
-        // 
-        lblChannelVisual.Anchor = AnchorStyles.Left;
-        lblChannelVisual.Location = new Point(72, 42);
-        lblChannelVisual.Name = "lblChannelVisual";
-        lblChannelVisual.Size = new Size(26, 15);
-        lblChannelVisual.TabIndex = 1;
-        lblChannelVisual.Text = "Idle";
-        // 
-        // lblChannelValueTitle
-        // 
-        lblChannelValueTitle.Anchor = AnchorStyles.Left;
-        lblChannelValueTitle.Location = new Point(190, 42);
-        lblChannelValueTitle.Name = "lblChannelValueTitle";
-        lblChannelValueTitle.Size = new Size(38, 15);
-        lblChannelValueTitle.TabIndex = 2;
-        lblChannelValueTitle.Text = "Pulse:";
-        // 
-        // lblChannelValue
-        // 
-        lblChannelValue.Anchor = AnchorStyles.Left;
-        lblChannelValue.Location = new Point(259, 42);
-        lblChannelValue.Name = "lblChannelValue";
-        lblChannelValue.Size = new Size(46, 15);
-        lblChannelValue.TabIndex = 3;
-        lblChannelValue.Text = "1500 us";
-        // 
-        // lblRollAngleTitle
-        // 
-        lblRollAngleTitle.Anchor = AnchorStyles.Left;
-        lblRollAngleTitle.Location = new Point(483, 42);
-        lblRollAngleTitle.Name = "lblRollAngleTitle";
-        lblRollAngleTitle.Size = new Size(62, 15);
-        lblRollAngleTitle.TabIndex = 4;
-        lblRollAngleTitle.Text = "Roll angle:";
-        // 
-        // lblRollAngle
-        // 
-        lblRollAngle.Anchor = AnchorStyles.Left;
-        lblRollAngle.Location = new Point(603, 42);
-        lblRollAngle.Name = "lblRollAngle";
-        lblRollAngle.Size = new Size(27, 15);
-        lblRollAngle.TabIndex = 5;
-        lblRollAngle.Text = "0.0°";
-        // 
-        // lblPitchAngleTitle
-        // 
-        lblPitchAngleTitle.Anchor = AnchorStyles.Left;
-        lblPitchAngleTitle.Location = new Point(723, 42);
-        lblPitchAngleTitle.Name = "lblPitchAngleTitle";
-        lblPitchAngleTitle.Size = new Size(69, 15);
-        lblPitchAngleTitle.TabIndex = 6;
-        lblPitchAngleTitle.Text = "Pitch angle:";
-        // 
-        // lblPitchAngle
-        // 
-        lblPitchAngle.Anchor = AnchorStyles.Left;
-        lblPitchAngle.Location = new Point(843, 42);
-        lblPitchAngle.Name = "lblPitchAngle";
-        lblPitchAngle.Size = new Size(27, 15);
-        lblPitchAngle.TabIndex = 7;
-        lblPitchAngle.Text = "0.0°";
-        // 
         // txtPidValues
         // 
-        txtPidValues.Anchor = AnchorStyles.None;
-        txtPidValues.Location = new Point(388, 251);
+        txtPidValues.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        txtPidValues.Location = new Point(594, 8);
         txtPidValues.Multiline = true;
         txtPidValues.Name = "txtPidValues";
         txtPidValues.ReadOnly = true;
-        txtPidValues.Size = new Size(361, 60);
+        txtPidValues.Size = new Size(297, 120);
         txtPidValues.TabIndex = 5;
         txtPidValues.Text = "Roll P/I/D: --/--/--\r\nPitch P/I/D: --/--/--";
         // 
         // txtPidRecommendation
         // 
-        txtPidRecommendation.Anchor = AnchorStyles.None;
-        txtPidRecommendation.Location = new Point(347, 422);
+        txtPidRecommendation.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        txtPidRecommendation.Location = new Point(594, 144);
         txtPidRecommendation.Multiline = true;
         txtPidRecommendation.Name = "txtPidRecommendation";
         txtPidRecommendation.ReadOnly = true;
-        txtPidRecommendation.Size = new Size(454, 90);
+        txtPidRecommendation.Size = new Size(297, 124);
         txtPidRecommendation.TabIndex = 3;
-        txtPidRecommendation.Text = "Run Roll or Pitch to generate a recommendation.";
+        txtPidRecommendation.Text = "Tune Roll or Pitch to generate a recommendation.";
         // 
         // topLayout
         // 
+        topLayout.AutoScroll = false;
         topLayout.Controls.Add(grpUsb);
         topLayout.Controls.Add(grpMapping);
         topLayout.Controls.Add(grpChannelTest);
-        topLayout.Location = new Point(13, 13);
+        topLayout.Dock = DockStyle.Top;
+        topLayout.Location = new Point(10, 10);
         topLayout.Name = "topLayout";
-        topLayout.Size = new Size(1363, 149);
+        topLayout.Size = new Size(939, 181);
         topLayout.TabIndex = 0;
         // 
         // grpUsb
         // 
         grpUsb.Controls.Add(usbLayout);
+        grpUsb.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         grpUsb.Location = new Point(3, 3);
         grpUsb.Name = "grpUsb";
         grpUsb.Padding = new Padding(10);
-        grpUsb.Size = new Size(534, 234);
+        grpUsb.Size = new Size(430, 176);
         grpUsb.TabIndex = 0;
         grpUsb.TabStop = false;
         grpUsb.Text = "Serial Ports";
@@ -694,29 +708,31 @@ partial class MainForm
         usbLayout.Controls.Add(lblArduinoPort);
         usbLayout.Controls.Add(cboArduinoPort);
         usbLayout.Controls.Add(cboArduinoBaud);
+        usbLayout.Controls.Add(lblTrainerPin);
+        usbLayout.Controls.Add(cboTrainerPin);
         usbLayout.Controls.Add(btnArduinoConnect);
         usbLayout.Controls.Add(btnArduinoDisconnect);
         usbLayout.Controls.Add(lblFCStatus);
         usbLayout.Location = new Point(10, 26);
         usbLayout.Name = "usbLayout";
-        usbLayout.Size = new Size(516, 115);
+        usbLayout.Size = new Size(502, 119);
         usbLayout.TabIndex = 0;
         // 
         // lblPort
         // 
         lblPort.Anchor = AnchorStyles.Left;
-        lblPort.Location = new Point(3, 14);
+        lblPort.Location = new Point(3, 8);
         lblPort.Name = "lblPort";
-        lblPort.Size = new Size(45, 15);
+        lblPort.Size = new Size(62, 15);
         lblPort.TabIndex = 0;
         lblPort.Text = "FC USB";
         // 
         // lblArduinoStatus
         // 
-        lblArduinoStatus.Location = new Point(273, 76);
+        lblArduinoStatus.Location = new Point(266, 87);
         lblArduinoStatus.Margin = new Padding(3, 3, 3, 0);
         lblArduinoStatus.Name = "lblArduinoStatus";
-        lblArduinoStatus.Size = new Size(244, 24);
+        lblArduinoStatus.Size = new Size(247, 15);
         lblArduinoStatus.TabIndex = 14;
         lblArduinoStatus.Text = "Waiting...";
         lblArduinoStatus.TextAlign = ContentAlignment.MiddleLeft;
@@ -725,9 +741,9 @@ partial class MainForm
         // 
         cboPort.DropDownStyle = ComboBoxStyle.DropDownList;
         cboPort.FormattingEnabled = true;
-        cboPort.Location = new Point(89, 3);
+        cboPort.Location = new Point(70, 7);
         cboPort.Name = "cboPort";
-        cboPort.Size = new Size(62, 23);
+        cboPort.Size = new Size(68, 23);
         cboPort.TabIndex = 1;
         // 
         // cboBaud
@@ -735,16 +751,16 @@ partial class MainForm
         cboBaud.DropDownStyle = ComboBoxStyle.DropDownList;
         cboBaud.FormattingEnabled = true;
         cboBaud.Items.AddRange(new object[] { "9600", "115200" });
-        cboBaud.Location = new Point(175, 3);
+        cboBaud.Location = new Point(139, 7);
         cboBaud.Name = "cboBaud";
-        cboBaud.Size = new Size(69, 23);
+        cboBaud.Size = new Size(64, 23);
         cboBaud.TabIndex = 2;
         // 
         // btnFcConnect
         // 
-        btnFcConnect.Location = new Point(261, 3);
+        btnFcConnect.Location = new Point(207, 6);
         btnFcConnect.Name = "btnFcConnect";
-        btnFcConnect.Size = new Size(79, 24);
+        btnFcConnect.Size = new Size(74, 24);
         btnFcConnect.TabIndex = 3;
         btnFcConnect.Text = "Connect";
         btnFcConnect.UseVisualStyleBackColor = true;
@@ -752,9 +768,9 @@ partial class MainForm
         // 
         // btnFcDisconnect
         // 
-        btnFcDisconnect.Location = new Point(347, 3);
+        btnFcDisconnect.Location = new Point(286, 6);
         btnFcDisconnect.Name = "btnFcDisconnect";
-        btnFcDisconnect.Size = new Size(80, 24);
+        btnFcDisconnect.Size = new Size(74, 24);
         btnFcDisconnect.TabIndex = 4;
         btnFcDisconnect.Text = "Disconnect";
         btnFcDisconnect.UseVisualStyleBackColor = true;
@@ -763,9 +779,9 @@ partial class MainForm
         // btnRefreshPorts
         // 
         btnRefreshPorts.ImageAlign = ContentAlignment.MiddleLeft;
-        btnRefreshPorts.Location = new Point(433, 3);
+        btnRefreshPorts.Location = new Point(365, 6);
         btnRefreshPorts.Name = "btnRefreshPorts";
-        btnRefreshPorts.Size = new Size(80, 24);
+        btnRefreshPorts.Size = new Size(74, 24);
         btnRefreshPorts.TabIndex = 5;
         btnRefreshPorts.Text = "Refresh Ports";
         btnRefreshPorts.UseVisualStyleBackColor = true;
@@ -774,9 +790,9 @@ partial class MainForm
         // lblArduinoPort
         // 
         lblArduinoPort.Anchor = AnchorStyles.Left;
-        lblArduinoPort.Location = new Point(3, 54);
+        lblArduinoPort.Location = new Point(3, 37);
         lblArduinoPort.Name = "lblArduinoPort";
-        lblArduinoPort.Size = new Size(50, 15);
+        lblArduinoPort.Size = new Size(62, 15);
         lblArduinoPort.TabIndex = 7;
         lblArduinoPort.Text = "Arduino";
         // 
@@ -784,9 +800,9 @@ partial class MainForm
         // 
         cboArduinoPort.DropDownStyle = ComboBoxStyle.DropDownList;
         cboArduinoPort.FormattingEnabled = true;
-        cboArduinoPort.Location = new Point(89, 43);
+        cboArduinoPort.Location = new Point(70, 36);
         cboArduinoPort.Name = "cboArduinoPort";
-        cboArduinoPort.Size = new Size(62, 23);
+        cboArduinoPort.Size = new Size(68, 23);
         cboArduinoPort.TabIndex = 8;
         // 
         // cboArduinoBaud
@@ -794,16 +810,35 @@ partial class MainForm
         cboArduinoBaud.DropDownStyle = ComboBoxStyle.DropDownList;
         cboArduinoBaud.FormattingEnabled = true;
         cboArduinoBaud.Items.AddRange(new object[] { "9600", "115200" });
-        cboArduinoBaud.Location = new Point(175, 43);
+        cboArduinoBaud.Location = new Point(139, 36);
         cboArduinoBaud.Name = "cboArduinoBaud";
-        cboArduinoBaud.Size = new Size(69, 23);
+        cboArduinoBaud.Size = new Size(64, 23);
         cboArduinoBaud.TabIndex = 9;
+        // 
+        // lblTrainerPin
+        // 
+        lblTrainerPin.Location = new Point(3, 63);
+        lblTrainerPin.Name = "lblTrainerPin";
+        lblTrainerPin.Size = new Size(62, 18);
+        lblTrainerPin.TabIndex = 15;
+        lblTrainerPin.Text = "Trainer Pin";
+        lblTrainerPin.TextAlign = ContentAlignment.MiddleLeft;
+        // 
+        // cboTrainerPin
+        // 
+        cboTrainerPin.DropDownStyle = ComboBoxStyle.DropDownList;
+        cboTrainerPin.FormattingEnabled = true;
+        cboTrainerPin.Items.AddRange(new object[] { "3", "5", "6", "9", "10", "11" });
+        cboTrainerPin.Location = new Point(70, 62);
+        cboTrainerPin.Name = "cboTrainerPin";
+        cboTrainerPin.Size = new Size(68, 23);
+        cboTrainerPin.TabIndex = 16;
         // 
         // btnArduinoConnect
         // 
-        btnArduinoConnect.Location = new Point(261, 43);
+        btnArduinoConnect.Location = new Point(207, 35);
         btnArduinoConnect.Name = "btnArduinoConnect";
-        btnArduinoConnect.Size = new Size(79, 24);
+        btnArduinoConnect.Size = new Size(74, 24);
         btnArduinoConnect.TabIndex = 10;
         btnArduinoConnect.Text = "Connect";
         btnArduinoConnect.UseVisualStyleBackColor = true;
@@ -811,9 +846,9 @@ partial class MainForm
         // 
         // btnArduinoDisconnect
         // 
-        btnArduinoDisconnect.Location = new Point(347, 43);
+        btnArduinoDisconnect.Location = new Point(286, 35);
         btnArduinoDisconnect.Name = "btnArduinoDisconnect";
-        btnArduinoDisconnect.Size = new Size(80, 24);
+        btnArduinoDisconnect.Size = new Size(74, 24);
         btnArduinoDisconnect.TabIndex = 11;
         btnArduinoDisconnect.Text = "Disconnect";
         btnArduinoDisconnect.UseVisualStyleBackColor = true;
@@ -821,11 +856,11 @@ partial class MainForm
         // 
         // lblFCStatus
         // 
-        lblFCStatus.Anchor = AnchorStyles.None;
-        lblFCStatus.Location = new Point(3, 78);
+        lblFCStatus.Anchor = AnchorStyles.Left;
+        lblFCStatus.Location = new Point(3, 87);
         lblFCStatus.Margin = new Padding(3, 3, 3, 0);
         lblFCStatus.Name = "lblFCStatus";
-        lblFCStatus.Size = new Size(244, 24);
+        lblFCStatus.Size = new Size(258, 15);
         lblFCStatus.TabIndex = 13;
         lblFCStatus.Text = "Waiting...";
         lblFCStatus.TextAlign = ContentAlignment.MiddleLeft;
@@ -833,10 +868,11 @@ partial class MainForm
         // grpMapping
         // 
         grpMapping.Controls.Add(mappingLayout);
-        grpMapping.Location = new Point(543, 3);
+        grpMapping.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+        grpMapping.Location = new Point(439, 3);
         grpMapping.Name = "grpMapping";
         grpMapping.Padding = new Padding(10);
-        grpMapping.Size = new Size(202, 234);
+        grpMapping.Size = new Size(182, 176);
         grpMapping.TabIndex = 1;
         grpMapping.TabStop = false;
         grpMapping.Text = "Transmitter Channel Mapping";
@@ -855,17 +891,17 @@ partial class MainForm
         mappingLayout.Controls.Add(btnPresetAetr);
         mappingLayout.Controls.Add(btnPresetRtae);
         mappingLayout.Controls.Add(btnPresetReat);
-        mappingLayout.Location = new Point(10, 26);
+        mappingLayout.Location = new Point(0, 26);
         mappingLayout.Name = "mappingLayout";
-        mappingLayout.Size = new Size(184, 115);
+        mappingLayout.Size = new Size(194, 119);
         mappingLayout.TabIndex = 0;
         // 
         // lblRoll
         // 
         lblRoll.Anchor = AnchorStyles.Left;
-        lblRoll.Location = new Point(3, 6);
+        lblRoll.Location = new Point(3, 7);
         lblRoll.Name = "lblRoll";
-        lblRoll.Size = new Size(31, 15);
+        lblRoll.Size = new Size(38, 15);
         lblRoll.TabIndex = 0;
         lblRoll.Text = "Ch 1";
         // 
@@ -874,17 +910,17 @@ partial class MainForm
         cboCH1.DropDownStyle = ComboBoxStyle.DropDownList;
         cboCH1.FormattingEnabled = true;
         cboCH1.Items.AddRange(new object[] { "A", "E", "T", "R" });
-        cboCH1.Location = new Point(47, 3);
+        cboCH1.Location = new Point(47, 5);
         cboCH1.Name = "cboCH1";
-        cboCH1.Size = new Size(39, 23);
+        cboCH1.Size = new Size(52, 23);
         cboCH1.TabIndex = 1;
         // 
         // lblPitch
         // 
         lblPitch.Anchor = AnchorStyles.Left;
-        lblPitch.Location = new Point(3, 34);
+        lblPitch.Location = new Point(3, 33);
         lblPitch.Name = "lblPitch";
-        lblPitch.Size = new Size(31, 15);
+        lblPitch.Size = new Size(38, 15);
         lblPitch.TabIndex = 2;
         lblPitch.Text = "Ch 2";
         // 
@@ -895,15 +931,15 @@ partial class MainForm
         cboCH2.Items.AddRange(new object[] { "A", "E", "T", "R" });
         cboCH2.Location = new Point(47, 31);
         cboCH2.Name = "cboCH2";
-        cboCH2.Size = new Size(39, 23);
+        cboCH2.Size = new Size(52, 23);
         cboCH2.TabIndex = 3;
         // 
         // lblThrottle
         // 
         lblThrottle.Anchor = AnchorStyles.Left;
-        lblThrottle.Location = new Point(3, 62);
+        lblThrottle.Location = new Point(3, 59);
         lblThrottle.Name = "lblThrottle";
-        lblThrottle.Size = new Size(31, 15);
+        lblThrottle.Size = new Size(38, 15);
         lblThrottle.TabIndex = 4;
         lblThrottle.Text = "Ch 3";
         // 
@@ -912,17 +948,17 @@ partial class MainForm
         cboCH3.DropDownStyle = ComboBoxStyle.DropDownList;
         cboCH3.FormattingEnabled = true;
         cboCH3.Items.AddRange(new object[] { "A", "E", "T", "R" });
-        cboCH3.Location = new Point(47, 59);
+        cboCH3.Location = new Point(47, 58);
         cboCH3.Name = "cboCH3";
-        cboCH3.Size = new Size(39, 23);
+        cboCH3.Size = new Size(52, 23);
         cboCH3.TabIndex = 5;
         // 
         // lblCh4
         // 
         lblCh4.Anchor = AnchorStyles.Left;
-        lblCh4.Location = new Point(3, 94);
+        lblCh4.Location = new Point(3, 86);
         lblCh4.Name = "lblCh4";
-        lblCh4.Size = new Size(31, 15);
+        lblCh4.Size = new Size(38, 15);
         lblCh4.TabIndex = 7;
         lblCh4.Text = "Ch 4";
         // 
@@ -931,14 +967,14 @@ partial class MainForm
         cboCH4.DropDownStyle = ComboBoxStyle.DropDownList;
         cboCH4.FormattingEnabled = true;
         cboCH4.Items.AddRange(new object[] { "A", "E", "T", "R" });
-        cboCH4.Location = new Point(47, 87);
+        cboCH4.Location = new Point(47, 84);
         cboCH4.Name = "cboCH4";
-        cboCH4.Size = new Size(39, 23);
+        cboCH4.Size = new Size(52, 23);
         cboCH4.TabIndex = 8;
         // 
         // btnApplyMapping
         // 
-        btnApplyMapping.Location = new Point(99, 3);
+        btnApplyMapping.Location = new Point(99, 5);
         btnApplyMapping.Name = "btnApplyMapping";
         btnApplyMapping.Size = new Size(75, 22);
         btnApplyMapping.TabIndex = 6;
@@ -958,7 +994,7 @@ partial class MainForm
         // 
         // btnPresetRtae
         // 
-        btnPresetRtae.Location = new Point(99, 59);
+        btnPresetRtae.Location = new Point(99, 58);
         btnPresetRtae.Name = "btnPresetRtae";
         btnPresetRtae.Size = new Size(75, 22);
         btnPresetRtae.TabIndex = 10;
@@ -968,9 +1004,9 @@ partial class MainForm
         // 
         // btnPresetReat
         // 
-        btnPresetReat.Location = new Point(99, 87);
+        btnPresetReat.Location = new Point(99, 84);
         btnPresetReat.Name = "btnPresetReat";
-        btnPresetReat.Size = new Size(75, 24);
+        btnPresetReat.Size = new Size(75, 22);
         btnPresetReat.TabIndex = 11;
         btnPresetReat.Text = "REAT";
         btnPresetReat.UseVisualStyleBackColor = true;
@@ -979,10 +1015,11 @@ partial class MainForm
         // grpChannelTest
         // 
         grpChannelTest.Controls.Add(channelTestLayout);
-        grpChannelTest.Location = new Point(771, 3);
+        grpChannelTest.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        grpChannelTest.Location = new Point(627, 3);
         grpChannelTest.Name = "grpChannelTest";
         grpChannelTest.Padding = new Padding(10);
-        grpChannelTest.Size = new Size(592, 234);
+        grpChannelTest.Size = new Size(309, 176);
         grpChannelTest.TabIndex = 0;
         grpChannelTest.TabStop = false;
         grpChannelTest.Text = "Channel Test";
@@ -990,10 +1027,12 @@ partial class MainForm
         // channelTestLayout
         // 
         channelTestLayout.Controls.Add(channelActionLayout);
+        channelTestLayout.Controls.Add(pnlSticks);
         channelTestLayout.Controls.Add(channelInputsLayout);
-        channelTestLayout.Location = new Point(13, 26);
+        channelTestLayout.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        channelTestLayout.Location = new Point(13, 23);
         channelTestLayout.Name = "channelTestLayout";
-        channelTestLayout.Size = new Size(572, 208);
+        channelTestLayout.Size = new Size(286, 145);
         channelTestLayout.TabIndex = 0;
         // 
         // channelActionLayout
@@ -1001,14 +1040,14 @@ partial class MainForm
         channelActionLayout.Controls.Add(btnTestRoll);
         channelActionLayout.Controls.Add(btnTestPitch);
         channelActionLayout.Controls.Add(btnTestThrottle);
-        channelActionLayout.Location = new Point(3, 3);
+        channelActionLayout.Location = new Point(3, 4);
         channelActionLayout.Name = "channelActionLayout";
-        channelActionLayout.Size = new Size(96, 112);
+        channelActionLayout.Size = new Size(96, 103);
         channelActionLayout.TabIndex = 0;
         // 
         // btnTestRoll
         // 
-        btnTestRoll.Location = new Point(3, 3);
+        btnTestRoll.Location = new Point(3, 0);
         btnTestRoll.Name = "btnTestRoll";
         btnTestRoll.Size = new Size(90, 29);
         btnTestRoll.TabIndex = 0;
@@ -1018,7 +1057,7 @@ partial class MainForm
         // 
         // btnTestPitch
         // 
-        btnTestPitch.Location = new Point(3, 38);
+        btnTestPitch.Location = new Point(3, 34);
         btnTestPitch.Name = "btnTestPitch";
         btnTestPitch.Size = new Size(90, 29);
         btnTestPitch.TabIndex = 1;
@@ -1028,13 +1067,58 @@ partial class MainForm
         // 
         // btnTestThrottle
         // 
-        btnTestThrottle.Location = new Point(3, 73);
+        btnTestThrottle.Location = new Point(3, 67);
         btnTestThrottle.Name = "btnTestThrottle";
         btnTestThrottle.Size = new Size(90, 29);
         btnTestThrottle.TabIndex = 2;
         btnTestThrottle.Text = "Throttle";
         btnTestThrottle.UseVisualStyleBackColor = true;
         btnTestThrottle.Click += btnTestThrottle_Click;
+        // 
+        // pnlSticks
+        // 
+        pnlSticks.Controls.Add(pnlLeftStick);
+        pnlSticks.Controls.Add(pnlRightStick);
+        pnlSticks.Location = new Point(104, 4);
+        pnlSticks.Name = "pnlSticks";
+        pnlSticks.Size = new Size(462, 103);
+        pnlSticks.TabIndex = 2;
+        // 
+        // pnlLeftStick
+        // 
+        pnlLeftStick.BorderStyle = BorderStyle.FixedSingle;
+        pnlLeftStick.Controls.Add(pnlLeftStickIndicator);
+        pnlLeftStick.Location = new Point(0, 0);
+        pnlLeftStick.Name = "pnlLeftStick";
+        pnlLeftStick.Size = new Size(228, 103);
+        pnlLeftStick.TabIndex = 0;
+        // 
+        // pnlLeftStickIndicator
+        // 
+        pnlLeftStickIndicator.Anchor = AnchorStyles.None;
+        pnlLeftStickIndicator.BackColor = Color.Red;
+        pnlLeftStickIndicator.Location = new Point(104, 50);
+        pnlLeftStickIndicator.Name = "pnlLeftStickIndicator";
+        pnlLeftStickIndicator.Size = new Size(10, 10);
+        pnlLeftStickIndicator.TabIndex = 0;
+        // 
+        // pnlRightStick
+        // 
+        pnlRightStick.BorderStyle = BorderStyle.FixedSingle;
+        pnlRightStick.Controls.Add(pnlRightStickIndicator);
+        pnlRightStick.Location = new Point(234, 0);
+        pnlRightStick.Name = "pnlRightStick";
+        pnlRightStick.Size = new Size(228, 103);
+        pnlRightStick.TabIndex = 1;
+        // 
+        // pnlRightStickIndicator
+        // 
+        pnlRightStickIndicator.Anchor = AnchorStyles.None;
+        pnlRightStickIndicator.BackColor = Color.Blue;
+        pnlRightStickIndicator.Location = new Point(104, 50);
+        pnlRightStickIndicator.Name = "pnlRightStickIndicator";
+        pnlRightStickIndicator.Size = new Size(10, 10);
+        pnlRightStickIndicator.TabIndex = 0;
         // 
         // channelInputsLayout
         // 
@@ -1047,26 +1131,26 @@ partial class MainForm
         channelInputsLayout.Controls.Add(lblThrottleUs);
         channelInputsLayout.Controls.Add(nudThrottleUs);
         channelInputsLayout.Controls.Add(nudTargetDeg);
-        channelInputsLayout.Location = new Point(3, 209);
+        channelInputsLayout.Location = new Point(3, 109);
         channelInputsLayout.Name = "channelInputsLayout";
-        channelInputsLayout.Size = new Size(566, 41);
+        channelInputsLayout.Size = new Size(566, 37);
         channelInputsLayout.TabIndex = 3;
         // 
         // lblTargetDeg
         // 
         lblTargetDeg.Anchor = AnchorStyles.Left;
-        lblTargetDeg.Location = new Point(3, 42);
+        lblTargetDeg.Location = new Point(3, 5);
         lblTargetDeg.Name = "lblTargetDeg";
-        lblTargetDeg.Size = new Size(55, 15);
+        lblTargetDeg.Size = new Size(43, 15);
         lblTargetDeg.TabIndex = 0;
-        lblTargetDeg.Text = "Target Δ°";
+        lblTargetDeg.Text = "Target deg";
         // 
         // lblSettleSec
         // 
         lblSettleSec.Anchor = AnchorStyles.Left;
-        lblSettleSec.Location = new Point(243, 42);
+        lblSettleSec.Location = new Point(116, 5);
         lblSettleSec.Name = "lblSettleSec";
-        lblSettleSec.Size = new Size(92, 15);
+        lblSettleSec.Size = new Size(73, 15);
         lblSettleSec.TabIndex = 2;
         lblSettleSec.Text = "Pre-Test Wait (s)";
         // 
@@ -1074,19 +1158,19 @@ partial class MainForm
         // 
         nudSettleSec.DecimalPlaces = 1;
         nudSettleSec.Increment = new decimal(new int[] { 1, 0, 0, 65536 });
-        nudSettleSec.Location = new Point(363, 3);
+        nudSettleSec.Location = new Point(192, 4);
         nudSettleSec.Maximum = new decimal(new int[] { 10, 0, 0, 0 });
         nudSettleSec.Name = "nudSettleSec";
-        nudSettleSec.Size = new Size(64, 23);
+        nudSettleSec.Size = new Size(56, 23);
         nudSettleSec.TabIndex = 3;
         nudSettleSec.Value = new decimal(new int[] { 2, 0, 0, 0 });
         // 
         // lblBaselineSec
         // 
         lblBaselineSec.Anchor = AnchorStyles.Left;
-        lblBaselineSec.Location = new Point(483, 42);
+        lblBaselineSec.Location = new Point(256, 5);
         lblBaselineSec.Name = "lblBaselineSec";
-        lblBaselineSec.Size = new Size(114, 15);
+        lblBaselineSec.Size = new Size(83, 15);
         lblBaselineSec.TabIndex = 4;
         lblBaselineSec.Text = "Wait Between Steps (s)";
         // 
@@ -1094,41 +1178,42 @@ partial class MainForm
         // 
         nudBaselineSec.DecimalPlaces = 1;
         nudBaselineSec.Increment = new decimal(new int[] { 1, 0, 0, 65536 });
-        nudBaselineSec.Location = new Point(603, 3);
+        nudBaselineSec.Location = new Point(343, 4);
         nudBaselineSec.Maximum = new decimal(new int[] { 10, 0, 0, 0 });
         nudBaselineSec.Name = "nudBaselineSec";
-        nudBaselineSec.Size = new Size(64, 23);
+        nudBaselineSec.Size = new Size(56, 23);
         nudBaselineSec.TabIndex = 5;
         nudBaselineSec.Value = new decimal(new int[] { 1, 0, 0, 0 });
         // 
         // lblThrottleUs
         // 
         lblThrottleUs.Anchor = AnchorStyles.Left;
-        lblThrottleUs.Location = new Point(723, 42);
+        lblThrottleUs.Location = new Point(410, 5);
         lblThrottleUs.Name = "lblThrottleUs";
-        lblThrottleUs.Size = new Size(71, 15);
+        lblThrottleUs.Size = new Size(65, 15);
         lblThrottleUs.TabIndex = 6;
         lblThrottleUs.Text = "Throttle (us)";
         // 
         // nudThrottleUs
         // 
         nudThrottleUs.Increment = new decimal(new int[] { 10, 0, 0, 0 });
-        nudThrottleUs.Location = new Point(843, 3);
+        nudThrottleUs.Location = new Point(479, 4);
         nudThrottleUs.Maximum = new decimal(new int[] { 1300, 0, 0, 0 });
         nudThrottleUs.Minimum = new decimal(new int[] { 1150, 0, 0, 0 });
         nudThrottleUs.Name = "nudThrottleUs";
-        nudThrottleUs.Size = new Size(72, 23);
+        nudThrottleUs.Size = new Size(60, 23);
         nudThrottleUs.TabIndex = 7;
         nudThrottleUs.Value = new decimal(new int[] { 1150, 0, 0, 0 });
         // 
         // nudTargetDeg
         // 
+        nudTargetDeg.Anchor = AnchorStyles.Left;
         nudTargetDeg.DecimalPlaces = 1;
-        nudTargetDeg.Location = new Point(123, 3);
+        nudTargetDeg.Location = new Point(52, 4);
         nudTargetDeg.Maximum = new decimal(new int[] { 45, 0, 0, 0 });
         nudTargetDeg.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
         nudTargetDeg.Name = "nudTargetDeg";
-        nudTargetDeg.Size = new Size(64, 23);
+        nudTargetDeg.Size = new Size(53, 23);
         nudTargetDeg.TabIndex = 1;
         nudTargetDeg.Value = new decimal(new int[] { 20, 0, 0, 0 });
         // 
@@ -1150,25 +1235,25 @@ partial class MainForm
         // 
         AutoScaleDimensions = new SizeF(7F, 15F);
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(1389, 1077);
+        ClientSize = new Size(959, 534);
         Controls.Add(rootLayout);
-        MinimumSize = new Size(900, 560);
+        MinimumSize = new Size(898, 475);
         Name = "MainForm";
         StartPosition = FormStartPosition.CenterScreen;
         Text = "Drone PID Tuning Assistant (WinForms)";
         rootLayout.ResumeLayout(false);
         grpPortingArea.ResumeLayout(false);
         grpPidWorkflow.ResumeLayout(false);
-        pidWorkflowLayout.ResumeLayout(false);
         pidButtonLayout.ResumeLayout(false);
+        channelVisualLayout.ResumeLayout(false);
         grpTuningProgress.ResumeLayout(false);
         tuningProgressLayout.ResumeLayout(false);
         pnlScoreChart.ResumeLayout(false);
         pnlScoreChart.PerformLayout();
+        grpTelemetry.ResumeLayout(false);
         telemetryLayout.ResumeLayout(false);
         telemetryButtonLayout.ResumeLayout(false);
         telemetryValueLayout.ResumeLayout(false);
-        channelVisualLayout.ResumeLayout(false);
         topLayout.ResumeLayout(false);
         grpUsb.ResumeLayout(false);
         usbLayout.ResumeLayout(false);
@@ -1177,6 +1262,9 @@ partial class MainForm
         grpChannelTest.ResumeLayout(false);
         channelTestLayout.ResumeLayout(false);
         channelActionLayout.ResumeLayout(false);
+        pnlSticks.ResumeLayout(false);
+        pnlLeftStick.ResumeLayout(false);
+        pnlRightStick.ResumeLayout(false);
         channelInputsLayout.ResumeLayout(false);
         ((System.ComponentModel.ISupportInitialize)nudSettleSec).EndInit();
         ((System.ComponentModel.ISupportInitialize)nudBaselineSec).EndInit();
@@ -1197,6 +1285,8 @@ partial class MainForm
     private Label lblArduinoPort;
     private ComboBox cboArduinoPort;
     private ComboBox cboArduinoBaud;
+    private Label lblTrainerPin;
+    private ComboBox cboTrainerPin;
     private Button btnArduinoConnect;
     private Button btnArduinoDisconnect;
     private Button btnRefreshPorts;
@@ -1275,6 +1365,11 @@ partial class MainForm
     private Button btnTestRoll;
     private Button btnTestPitch;
     private Button btnTestThrottle;
+    private Panel pnlSticks;
+    private Panel pnlLeftStick;
+    private Panel pnlLeftStickIndicator;
+    private Panel pnlRightStick;
+    private Panel pnlRightStickIndicator;
     private Panel channelInputsLayout;
     private Label lblTargetDeg;
     private Label lblSettleSec;
