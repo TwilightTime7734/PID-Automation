@@ -43,9 +43,15 @@ public sealed partial class MainForm : Form
         ["mc_p_roll"] = 40,
         ["mc_i_roll"] = 50,
         ["mc_d_roll"] = 30,
+        ["mc_ff_roll"] = 40,
         ["mc_p_pitch"] = 40,
         ["mc_i_pitch"] = 50,
         ["mc_d_pitch"] = 30,
+        ["mc_ff_pitch"] = 40,
+        ["mc_p_yaw"] = 45,
+        ["mc_i_yaw"] = 55,
+        ["mc_d_yaw"] = 0,
+        ["mc_ff_yaw"] = 35,
     };
     private PidAdjustmentRecommendation? _pendingRecommendation;
     private int _ch1PulseUs = 1500;
@@ -747,7 +753,7 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        if (!_arduinoConnected || !_arduinoTrainerClient.IsConnected)
+        if (!_simulationMode && (!_arduinoConnected || !_arduinoTrainerClient.IsConnected))
         {
             return;
         }
@@ -840,8 +846,8 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        var activePath = GetActiveControlPath();
-        if (activePath == ControlPath.None)
+        var activePath = _simulationMode ? ControlPath.ArduinoTransmitter : GetActiveControlPath();
+        if (!_simulationMode && activePath == ControlPath.None)
         {
             MessageBox.Show(this, "Connect FC USB or Arduino before running channel tests.", "Channel test unavailable", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
@@ -885,7 +891,7 @@ public sealed partial class MainForm : Form
 
         try
         {
-            lblFCStatus.Text = $"Testing {control} on {channelCode} via {DescribeControlPath(activePath)}...";
+            lblFCStatus.Text = $"Testing {control} on {channelCode} via {DescribeActivePath()}...";
 
             if (settleMs > 0)
             {
@@ -980,7 +986,7 @@ public sealed partial class MainForm : Form
                 CenterArduinoFlightControls();
             }
             SetChannelTestVisual("Idle", control == "throttle" ? 1000 : 1500, 0.0, 0.0);
-            lblFCStatus.Text = $"Completed {control} channel test on {channelCode} via {DescribeControlPath(activePath)}.";
+            lblFCStatus.Text = $"Completed {control} channel test on {channelCode} via {DescribeActivePath()}.";
         }
         finally
         {
@@ -1151,13 +1157,18 @@ public sealed partial class MainForm : Form
         try
         {
             double score;
-            if (_arduinoConnected)
+            DirectionMetrics? positiveMetrics = null;
+            DirectionMetrics? negativeMetrics = null;
+            if (_arduinoConnected || _simulationMode)
             {
-                score = await RunAxisDynamicScoreAsync(
-                    axis,
-                    targetDeg: Math.Max(5.0, (double)nudTargetDeg.Value),
-                    durationSec: 5.0,
-                    throttleUs: (int)nudThrottleUs.Value);
+                var baseline = await RecordAxisBaselineRateAsync(axis, Math.Max(0.3, (double)nudBaselineSec.Value));
+                var targetDeg = Math.Max(5.0, (double)nudTargetDeg.Value);
+                var durationSec = 5.0;
+                var throttleUs = (int)nudThrottleUs.Value;
+                positiveMetrics = await CaptureDirectionMetricsAsync(axis, Math.Abs(targetDeg), durationSec, baseline, throttleUs);
+                await Task.Delay(250);
+                negativeMetrics = await CaptureDirectionMetricsAsync(axis, -Math.Abs(targetDeg), durationSec, baseline, throttleUs);
+                score = (positiveMetrics.Score + negativeMetrics.Score) / 2.0;
             }
             else
             {
@@ -1170,7 +1181,7 @@ public sealed partial class MainForm : Form
             var recommendation = BuildRecommendation(axis, score);
             _pendingRecommendation = recommendation;
 
-            AppendTuningRun(axis, iteration, score, recommendation);
+            AppendTuningRun(axis, iteration, score, recommendation, positiveMetrics, negativeMetrics);
             lblFCStatus.Text = $"Completed {axis} round {iteration}. Score {score:F2}.";
         }
         catch (Exception ex)
@@ -1218,15 +1229,6 @@ public sealed partial class MainForm : Form
         }
         return new PidAdjustmentRecommendation(axis, "none", "none", 0,
             $"Recommendation: axis looks stable (score {score:F2}). No PID change required.");
-    }
-
-    private async Task<double> RunAxisDynamicScoreAsync(string axis, double targetDeg, double durationSec, int throttleUs)
-    {
-        var baseline = await RecordAxisBaselineRateAsync(axis, Math.Max(0.3, (double)nudBaselineSec.Value));
-        var positive = await CaptureDirectionMetricsAsync(axis, Math.Abs(targetDeg), durationSec, baseline, throttleUs);
-        await Task.Delay(250);
-        var negative = await CaptureDirectionMetricsAsync(axis, -Math.Abs(targetDeg), durationSec, baseline, throttleUs);
-        return (positive.Score + negative.Score) / 2.0;
     }
 
     private async Task<double> RecordAxisBaselineRateAsync(string axis, double durationSec)
@@ -1320,7 +1322,7 @@ public sealed partial class MainForm : Form
         }
 
         var score = ComputeDirectionScore(movementRates, angleDeltas, target, durationSec);
-        return new DirectionMetrics(score);
+        return new DirectionMetrics(score, timeData, movementRates, commandDeg);
     }
 
     private static int ToPulseFromCommandDeg(double commandDeg)
@@ -1388,18 +1390,17 @@ public sealed partial class MainForm : Form
             + (settlingTime / Math.Max(durationSec, 0.001));
     }
 
-    private void AppendTuningRun(string axis, int iteration, double score, PidAdjustmentRecommendation recommendation)
+    private void AppendTuningRun(
+        string axis,
+        int iteration,
+        double score,
+        PidAdjustmentRecommendation recommendation,
+        DirectionMetrics? positiveMetrics,
+        DirectionMetrics? negativeMetrics)
     {
         var runNumber = _tuningRuns.Count + 1;
-        var record = new TuningRunRecord(runNumber, axis, iteration, score, recommendation.Message);
+        var record = new TuningRunRecord(runNumber, axis, iteration, score, recommendation.Message, positiveMetrics, negativeMetrics);
         _tuningRuns.Add(record);
-
-        var item = new ListViewItem(runNumber.ToString(CultureInfo.InvariantCulture));
-        item.SubItems.Add(axis.ToUpperInvariant());
-        item.SubItems.Add(score.ToString("F2", CultureInfo.InvariantCulture));
-        item.SubItems.Add(recommendation.Message);
-        lvTuningRuns.Items.Add(item);
-        lvTuningRuns.EnsureVisible(lvTuningRuns.Items.Count - 1);
 
         pnlScoreChart.Invalidate();
     }
@@ -1699,44 +1700,113 @@ public sealed partial class MainForm : Form
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Color.White);
 
-        if (_tuningRuns.Count < 2)
+        if (_tuningRuns.Count == 0)
         {
             using var textBrush = new SolidBrush(Color.DimGray);
-            g.DrawString("Run at least 2 rounds to chart score trend.", Font, textBrush, bounds.X + 8, bounds.Y + 8);
+            g.DrawString("Run an axis test to render the first response graph.", Font, textBrush, bounds.X + 8, bounds.Y + 8);
             return;
         }
 
-        var left = bounds.Left + 30;
-        var top = bounds.Top + 8;
-        var width = bounds.Width - 40;
-        var height = bounds.Height - 24;
-
-        var minScore = _tuningRuns.Min(r => r.Score);
-        var maxScore = _tuningRuns.Max(r => r.Score);
-        if (Math.Abs(maxScore - minScore) < 0.001)
+        var latest = _tuningRuns[^1];
+        if (latest.Positive is null || latest.Negative is null
+            || latest.Positive.TimeData.Count == 0 || latest.Negative.TimeData.Count == 0)
         {
-            maxScore = minScore + 1.0;
+            using var textBrush = new SolidBrush(Color.DimGray);
+            g.DrawString("Graph is available after a full hardware direction capture.", Font, textBrush, bounds.X + 8, bounds.Y + 8);
+            g.DrawString($"Latest score: {latest.Score:F2} ({latest.Axis.ToUpperInvariant()} R{latest.Iteration})", Font, textBrush, bounds.X + 8, bounds.Y + 28);
+            g.DrawString(latest.Recommendation, Font, textBrush, bounds.X + 8, bounds.Bottom - 26);
+            return;
+        }
+
+        var left = bounds.Left + 55;
+        var top = bounds.Top + 28;
+        var width = Math.Max(100, bounds.Width - 75);
+        var height = Math.Max(100, bounds.Height - 92);
+        var plotRect = new Rectangle(left, top, width, height);
+
+        var posTime = latest.Positive.TimeData;
+        var negTime = latest.Negative.TimeData;
+        var posMove = latest.Positive.MovementData;
+        var negMove = latest.Negative.MovementData;
+
+        var tMax = Math.Max(posTime.Max(), negTime.Max());
+        if (tMax < 0.001)
+        {
+            tMax = 1.0;
+        }
+
+        var allY = posMove.Concat(negMove)
+            .Concat(new[] { latest.Positive.Command, latest.Negative.Command, 0.0 })
+            .ToList();
+        var yMin = allY.Min();
+        var yMax = allY.Max();
+        if (Math.Abs(yMax - yMin) < 0.001)
+        {
+            yMax = yMin + 1.0;
+        }
+
+        var yPad = (yMax - yMin) * 0.1;
+        yMin -= yPad;
+        yMax += yPad;
+
+        using var gridPen = new Pen(Color.FromArgb(230, 230, 230), 1);
+        for (var i = 1; i < 5; i++)
+        {
+            var gx = plotRect.Left + (plotRect.Width * i / 5f);
+            g.DrawLine(gridPen, gx, plotRect.Top, gx, plotRect.Bottom);
+            var gy = plotRect.Top + (plotRect.Height * i / 5f);
+            g.DrawLine(gridPen, plotRect.Left, gy, plotRect.Right, gy);
         }
 
         using var axisPen = new Pen(Color.Silver, 1);
-        g.DrawRectangle(axisPen, left, top, width, height);
+        g.DrawRectangle(axisPen, plotRect);
 
-        var points = new PointF[_tuningRuns.Count];
-        for (var i = 0; i < _tuningRuns.Count; i++)
+        var yZero = plotRect.Bottom - (float)((0 - yMin) / Math.Max(0.001, yMax - yMin) * plotRect.Height);
+        using var zeroPen = new Pen(Color.FromArgb(70, 70, 70), 1);
+        g.DrawLine(zeroPen, plotRect.Left, yZero, plotRect.Right, yZero);
+
+        var yPosTarget = plotRect.Bottom - (float)((latest.Positive.Command - yMin) / Math.Max(0.001, yMax - yMin) * plotRect.Height);
+        var yNegTarget = plotRect.Bottom - (float)((latest.Negative.Command - yMin) / Math.Max(0.001, yMax - yMin) * plotRect.Height);
+        using var posTargetPen = new Pen(Color.Red, 1) { DashStyle = DashStyle.Dash };
+        using var negTargetPen = new Pen(Color.Purple, 1) { DashStyle = DashStyle.Dash };
+        g.DrawLine(posTargetPen, plotRect.Left, yPosTarget, plotRect.Right, yPosTarget);
+        g.DrawLine(negTargetPen, plotRect.Left, yNegTarget, plotRect.Right, yNegTarget);
+
+        DrawSeries(g, plotRect, posTime, posMove, tMax, yMin, yMax, Color.FromArgb(30, 120, 200));
+        DrawSeries(g, plotRect, negTime, negMove, tMax, yMin, yMax, Color.FromArgb(220, 140, 30));
+
+        using var titleBrush = new SolidBrush(Color.Black);
+        g.DrawString($"{latest.Axis.ToUpperInvariant()} Two-Direction PID Response - Round {latest.Iteration} | Score {latest.Score:F2}", Font, titleBrush, bounds.Left + 8, bounds.Top + 6);
+        using var recBrush = new SolidBrush(Color.FromArgb(60, 60, 60));
+        g.DrawString(latest.Recommendation, Font, recBrush, bounds.Left + 8, bounds.Bottom - 26);
+    }
+
+    private static void DrawSeries(
+        Graphics g,
+        Rectangle plotRect,
+        IReadOnlyList<double> timeData,
+        IReadOnlyList<double> values,
+        double maxTime,
+        double minY,
+        double maxY,
+        Color color)
+    {
+        if (timeData.Count < 2 || values.Count < 2)
         {
-            var x = left + (width * i / (float)(_tuningRuns.Count - 1));
-            var normalized = (_tuningRuns[i].Score - minScore) / (maxScore - minScore);
-            var y = top + height - (float)(normalized * height);
+            return;
+        }
+
+        var count = Math.Min(timeData.Count, values.Count);
+        var points = new PointF[count];
+        for (var i = 0; i < count; i++)
+        {
+            var x = plotRect.Left + (float)(timeData[i] / Math.Max(0.001, maxTime) * plotRect.Width);
+            var y = plotRect.Bottom - (float)((values[i] - minY) / Math.Max(0.001, maxY - minY) * plotRect.Height);
             points[i] = new PointF(x, y);
         }
 
-        using var linePen = new Pen(Color.FromArgb(30, 120, 200), 2);
-        g.DrawLines(linePen, points);
-        using var pointBrush = new SolidBrush(Color.FromArgb(15, 90, 170));
-        foreach (var point in points)
-        {
-            g.FillEllipse(pointBrush, point.X - 3, point.Y - 3, 6, 6);
-        }
+        using var pen = new Pen(color, 2f);
+        g.DrawLines(pen, points);
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
@@ -1776,11 +1846,32 @@ public sealed partial class MainForm : Form
         }
 
         _arduinoConnected = false;
+        if (_simulationMode)
+        {
+            ResetSimulationPidDefaults();
+            RefreshPidSnapshotFromFc();
+        }
         SetArduinoStatus(_simulationMode
             ? "Simulation mode selected."
             : "Arduino not connected.");
         UpdateSimulationToggleVisual();
         UpdateSerialConnectionUi();
+    }
+
+    private void ResetSimulationPidDefaults()
+    {
+        _simPidSettings["mc_p_roll"] = 40;
+        _simPidSettings["mc_i_roll"] = 50;
+        _simPidSettings["mc_d_roll"] = 30;
+        _simPidSettings["mc_ff_roll"] = 40;
+        _simPidSettings["mc_p_pitch"] = 40;
+        _simPidSettings["mc_i_pitch"] = 50;
+        _simPidSettings["mc_d_pitch"] = 30;
+        _simPidSettings["mc_ff_pitch"] = 40;
+        _simPidSettings["mc_p_yaw"] = 45;
+        _simPidSettings["mc_i_yaw"] = 55;
+        _simPidSettings["mc_d_yaw"] = 0;
+        _simPidSettings["mc_ff_yaw"] = 35;
     }
 
     private void UpdateSimulationToggleVisual()
@@ -1888,7 +1979,14 @@ public sealed partial class MainForm : Form
 
     }
 
-    private sealed record TuningRunRecord(int RunNumber, string Axis, int Iteration, double Score, string Recommendation);
+    private sealed record TuningRunRecord(
+        int RunNumber,
+        string Axis,
+        int Iteration,
+        double Score,
+        string Recommendation,
+        DirectionMetrics? Positive,
+        DirectionMetrics? Negative);
     private sealed record PidAdjustmentRecommendation(string Axis, string Gain, string Direction, int Points, string Message);
-    private sealed record DirectionMetrics(double Score);
+    private sealed record DirectionMetrics(double Score, IReadOnlyList<double> TimeData, IReadOnlyList<double> MovementData, double Command);
 }

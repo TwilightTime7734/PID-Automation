@@ -120,11 +120,6 @@ partial class MainForm
         btnReadFcPid = new Button();
         btnSaveFcPid = new Button();
         pnlScoreChart = new Panel();
-        lvTuningRuns = new ListView();
-        colRun = new ColumnHeader();
-        colAxis = new ColumnHeader();
-        colScore = new ColumnHeader();
-        colDecision = new ColumnHeader();
         rootLayout.SuspendLayout();
         grpUsb.SuspendLayout();
         grpMapping.SuspendLayout();
@@ -153,7 +148,6 @@ partial class MainForm
         rootLayout.Controls.Add(grpChannelTest, 2, 0);
         rootLayout.Controls.Add(grpPidWorkflow, 0, 1);
         rootLayout.Controls.Add(pnlScoreChart, 0, 2);
-        rootLayout.Controls.Add(lvTuningRuns, 2, 1);
         rootLayout.Dock = DockStyle.Fill;
         rootLayout.Location = new Point(0, 0);
         rootLayout.Name = "rootLayout";
@@ -1261,37 +1255,6 @@ partial class MainForm
         pnlScoreChart.TabIndex = 0;
         pnlScoreChart.Paint += pnlScoreChart_Paint;
         // 
-        // lvTuningRuns
-        // 
-        lvTuningRuns.Columns.AddRange(new ColumnHeader[] { colRun, colAxis, colScore, colDecision });
-        lvTuningRuns.FullRowSelect = true;
-        lvTuningRuns.Location = new Point(852, 220);
-        lvTuningRuns.Name = "lvTuningRuns";
-        lvTuningRuns.Size = new Size(652, 139);
-        lvTuningRuns.TabIndex = 1;
-        lvTuningRuns.UseCompatibleStateImageBehavior = false;
-        lvTuningRuns.View = View.Details;
-        // 
-        // colRun
-        // 
-        colRun.Text = "Run";
-        colRun.Width = 55;
-        // 
-        // colAxis
-        // 
-        colAxis.Text = "Axis";
-        colAxis.Width = 70;
-        // 
-        // colScore
-        // 
-        colScore.Text = "Score";
-        colScore.Width = 70;
-        // 
-        // colDecision
-        // 
-        colDecision.Text = "Recommendation";
-        colDecision.Width = 430;
-        // 
         // MainForm
         // 
         AutoScaleDimensions = new SizeF(7F, 15F);
@@ -1394,11 +1357,6 @@ partial class MainForm
     private Label lblActiveAxis;
     private Label lblPidValuesTitle;
     private Panel pnlScoreChart;
-    private ListView lvTuningRuns;
-    private ColumnHeader colRun;
-    private ColumnHeader colAxis;
-    private ColumnHeader colScore;
-    private ColumnHeader colDecision;
     private Panel channelVisualLayout;
     private Label lblChannelVisualTitle;
     private Label lblChannelVisual;
