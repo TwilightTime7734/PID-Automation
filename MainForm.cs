@@ -65,6 +65,7 @@ public sealed partial class MainForm : Form
         cboBaud.SelectedIndexChanged += (_, _) => OnFcBaudChanged();
         cboArduinoBaud.SelectedIndexChanged += (_, _) => OnArduinoBaudChanged();
         cboTrainerPin.SelectedIndexChanged += (_, _) => OnTrainerPinChanged();
+        chkSimulation.CheckedChanged += (_, _) => OnSimulationModeChanged();
         if (cboTrainerPin.Items.Count > 0)
         {
             cboTrainerPin.SelectedItem = DefaultTrainerPin.ToString(CultureInfo.InvariantCulture);
@@ -555,6 +556,15 @@ public sealed partial class MainForm : Form
 
     private void ConnectArduinoUsb()
     {
+        if (chkSimulation.Checked)
+        {
+            _arduinoConnected = true;
+            SetArduinoStatus("Simulation mode active - no Arduino hardware is being used.");
+            CenterArduinoFlightControls();
+            UpdateSerialConnectionUi();
+            return;
+        }
+
         if (cboArduinoPort.SelectedItem is not string portName || string.IsNullOrWhiteSpace(portName))
         {
             MessageBox.Show(this, "Select an Arduino serial port first.", "Missing port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -583,6 +593,14 @@ public sealed partial class MainForm : Form
 
     private void DisconnectArduinoUsb()
     {
+        if (chkSimulation.Checked)
+        {
+            _arduinoConnected = false;
+            SetArduinoStatus("Simulation mode disconnected.");
+            UpdateSerialConnectionUi();
+            return;
+        }
+
         try
         {
             if (_arduinoTrainerClient.IsConnected)
@@ -614,10 +632,14 @@ public sealed partial class MainForm : Form
         btnFcConnect.Enabled = !_startupScanInProgress && fcPortSelected && !fcSelectedIsConnected;
         btnFcDisconnect.Enabled = fcSelectedIsConnected;
 
+        var simulationEnabled = chkSimulation.Checked;
         var arduinoPortSelected = cboArduinoPort.SelectedItem is string arduinoPort && !string.IsNullOrWhiteSpace(arduinoPort);
         var arduinoConnectedNow = _arduinoConnected || _arduinoTrainerClient.IsConnected;
-        btnArduinoConnect.Enabled = !_startupScanInProgress && arduinoPortSelected && !arduinoConnectedNow;
+        btnArduinoConnect.Enabled = !_startupScanInProgress && (simulationEnabled || arduinoPortSelected) && !arduinoConnectedNow;
         btnArduinoDisconnect.Enabled = arduinoConnectedNow;
+        cboArduinoPort.Enabled = !simulationEnabled;
+        cboArduinoBaud.Enabled = !simulationEnabled;
+        cboTrainerPin.Enabled = !simulationEnabled;
         UpdateWorkflowUiState();
     }
 
@@ -668,6 +690,12 @@ public sealed partial class MainForm : Form
 
     private void OnArduinoBaudChanged()
     {
+        if (chkSimulation.Checked)
+        {
+            SetArduinoStatus("Simulation mode active.");
+            return;
+        }
+
         var selected = GetSelectedBaud(cboArduinoBaud, DefaultSerialBaud);
         if (selected == _arduinoBaudRate)
         {
@@ -702,6 +730,11 @@ public sealed partial class MainForm : Form
 
     private void OnTrainerPinChanged()
     {
+        if (chkSimulation.Checked)
+        {
+            return;
+        }
+
         if (!_arduinoConnected || !_arduinoTrainerClient.IsConnected)
         {
             return;
@@ -988,6 +1021,14 @@ public sealed partial class MainForm : Form
 
     private void SetArduinoAxisPulse(string control, int pulseUs)
     {
+        if (chkSimulation.Checked)
+        {
+            var simAxisCode = AxisCodeForControl(control);
+            var simChannel = ChannelFromAxisCode(simAxisCode);
+            SetChannelPulseState(simChannel, pulseUs);
+            return;
+        }
+
         if (!_arduinoTrainerClient.IsConnected)
         {
             throw new InvalidOperationException("Arduino trainer cable is not connected.");
@@ -1001,6 +1042,15 @@ public sealed partial class MainForm : Form
 
     private void CenterArduinoFlightControls()
     {
+        if (chkSimulation.Checked)
+        {
+            SetChannelPulseState(ChannelFromAxisCode("A"), 1500);
+            SetChannelPulseState(ChannelFromAxisCode("E"), 1500);
+            SetChannelPulseState(ChannelFromAxisCode("T"), 1000);
+            SetChannelPulseState(ChannelFromAxisCode("R"), 1500);
+            return;
+        }
+
         if (!_arduinoTrainerClient.IsConnected)
         {
             return;
@@ -1090,15 +1140,20 @@ public sealed partial class MainForm : Form
         lblActiveAxis.Text = "N/A";
         txtPidRecommendation.Text = "Tune Roll or Pitch to generate a recommendation.";
         UpdatePidSnapshotPanel(null, null, null, null, null, null);
-        cmbManualAxis.Items.Clear();
-        cmbManualAxis.Items.AddRange(new object[] { "Roll", "Pitch" });
-        cmbManualAxis.SelectedIndex = 0;
-        cmbManualGain.Items.Clear();
-        cmbManualGain.Items.AddRange(new object[] { "P", "I", "D" });
-        cmbManualGain.SelectedIndex = 0;
-        cmbManualPoints.Items.Clear();
-        cmbManualPoints.Items.AddRange(new object[] { "1", "2", "3", "4", "5" });
-        cmbManualPoints.SelectedIndex = 0;
+        if (cmbManualAxis.Items.Count > 0 && cmbManualAxis.SelectedIndex < 0)
+        {
+            cmbManualAxis.SelectedIndex = 0;
+        }
+
+        if (cmbManualGain.Items.Count > 0 && cmbManualGain.SelectedIndex < 0)
+        {
+            cmbManualGain.SelectedIndex = 0;
+        }
+
+        if (cmbManualPoints.Items.Count > 0 && cmbManualPoints.SelectedIndex < 0)
+        {
+            cmbManualPoints.SelectedIndex = 0;
+        }
         UpdateWorkflowUiState();
     }
 
@@ -1659,6 +1714,20 @@ public sealed partial class MainForm : Form
     private async void btnTestRoll_Click(object sender, EventArgs e) => await RunChannelTestAsync("roll");
     private async void btnTestPitch_Click(object sender, EventArgs e) => await RunChannelTestAsync("pitch");
     private async void btnTestThrottle_Click(object sender, EventArgs e) => await RunChannelTestAsync("throttle");
+
+    private void OnSimulationModeChanged()
+    {
+        if (chkSimulation.Checked && _arduinoTrainerClient.IsConnected)
+        {
+            _arduinoTrainerClient.Disconnect();
+        }
+
+        _arduinoConnected = false;
+        SetArduinoStatus(chkSimulation.Checked
+            ? "Simulation mode selected."
+            : "Arduino not connected.");
+        UpdateSerialConnectionUi();
+    }
     private void btnTelemetryStart_Click(object sender, EventArgs e) => StartTelemetryLoop();
     private void btnTelemetryStop_Click(object sender, EventArgs e) => StopTelemetryLoop();
     private void btnTelemetrySnapshot_Click(object sender, EventArgs e) => TelemetrySnapshot();

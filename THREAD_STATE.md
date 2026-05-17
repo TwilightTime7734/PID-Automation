@@ -1,13 +1,19 @@
 Thread state snapshot
 
-- updated: 2026-05-16
+- updated: 2026-05-17
 - workspace: D:\VisualStudioCommunity\DronePidTuningAssistant.WinForms
+- python source project: D:\VisualStudioCode\Python
 - branch: main (local)
 - primary files: MainForm.cs, MainForm.Designer.cs, Services/SerialPortService.cs, Services/ArduinoTrainerCableClient.cs
 
 Current project state:
 - DockPanelSuite/docking framework removed.
 - Form layout is currently panel-based in Designer (TableLayoutPanel/FlowLayoutPanel were converted to Panel).
+- Top row layout (Serial Ports / Mapping / Channel Test) is currently unlocked/responsive:
+  - grpUsb: Dock=Left
+  - grpMapping: Dock=Left
+  - grpChannelTest: Dock=Fill
+  - channelTestLayout: Dock=Fill
 - Serial Ports section has FC and Arduino rows plus status labels:
   - FC: cboPort, cboBaud, btnFcConnect, btnFcDisconnect
   - Arduino: cboArduinoPort, cboArduinoBaud, btnArduinoConnect, btnArduinoDisconnect
@@ -38,6 +44,9 @@ Porting status (Python -> WinForms):
   - RunChannelTestAsync sends actual Arduino trainer pulses via channel mapping (A/E/T/R -> CH1..CH4 combo mapping).
   - centers controls at the end.
 - PID workflow:
+  - PID control enablement is FC USB-only (Arduino connection does not enable PID controls).
+  - PID button alignment/wording has been cleaned up in Designer.
+  - pidButtonLayout is in grpPidWorkflow; lvTuningRuns belongs in pnlScoreChart (restored).
   - if Arduino connected, uses dynamic scoring path with baseline angular-rate sampling + positive/negative direction capture + angle-target neutralization.
   - if Arduino not connected, uses legacy noise-only scoring fallback.
 
@@ -53,4 +62,4 @@ Backups present:
 - MainForm.Designer.cs.bak-before-flow-to-panel
 
 Last known successful compile:
-- dotnet build -c Debug (success, 0 errors)
+- dotnet build (success, 0 errors, 0 warnings)
