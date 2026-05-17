@@ -57,6 +57,7 @@ public sealed partial class MainForm : Form
     private double _ch3DisplayedPulseUs = 1000;
     private double _ch4DisplayedPulseUs = 1500;
     private System.Windows.Forms.Timer? _stickAnimationTimer;
+    private bool _pidGridEditable;
 
     // Stick UI controls for channel test visualizers
     private Panel _pnlLeftStick => pnlLeftStick;
@@ -93,6 +94,7 @@ public sealed partial class MainForm : Form
         InitializePidWorkflow();
         InitializeStickVisuals();
         UpdateSimulationToggleVisual();
+        SetPidGridEditable(false);
         UpdateSerialConnectionUi();
     }
 
@@ -184,16 +186,12 @@ public sealed partial class MainForm : Form
             else if (!string.IsNullOrWhiteSpace(result.fcConnectedPort))
             {
                 SetFcStatus($"Startup: FC on {result.fcConnectedPort}@{_fcBaudRate}.");
-                SetArduinoStatus(string.IsNullOrWhiteSpace(result.arduinoPort)
-                    ? "Arduino not connected."
-                    : $"Arduino port detected: {result.arduinoPort} (not connected)");
+                SetArduinoStatus("Arduino not connected.");
             }
             else
             {
                 SetFcStatus("FC not connected.");
-                SetArduinoStatus(string.IsNullOrWhiteSpace(result.arduinoPort)
-                    ? "Arduino not connected."
-                    : $"Arduino port detected: {result.arduinoPort} (not connected)");
+                SetArduinoStatus("Arduino not connected.");
             }
         }
         finally
@@ -551,6 +549,7 @@ public sealed partial class MainForm : Form
         {
             _serialPortService.Connect(portName, baudRate);
             lblFCStatus.Text = $"Connected FC USB: {portName}@{baudRate}";
+            RefreshPidSnapshotFromFc();
             UpdateSerialConnectionUi();
         }
         catch (Exception ex)
@@ -564,6 +563,7 @@ public sealed partial class MainForm : Form
     private void DisconnectUsb()
     {
         _serialPortService.Disconnect();
+        RefreshPidSnapshotFromFc();
         UpdateSerialConnectionUi();
     }
 
@@ -799,18 +799,28 @@ public sealed partial class MainForm : Form
         };
     }
 
+    private string DescribeActivePath()
+    {
+        if (_simulationMode)
+        {
+            return "Simulator";
+        }
+
+        return DescribeControlPath(GetActiveControlPath());
+    }
+
     private void UpdateWorkflowUiState()
     {
         var fcConnected = _serialPortService.IsConnected;
         var activePath = GetActiveControlPath();
-        var canRunChannelTests = _arduinoConnected;
+        var canRunChannelTests = _arduinoConnected || _simulationMode;
 
         if (!_channelTestRunning)
         {
             btnTestRoll.Enabled = canRunChannelTests;
             btnTestPitch.Enabled = canRunChannelTests;
             btnTestThrottle.Enabled = canRunChannelTests;
-            lblChannelVisual.Text = $"Path: {DescribeControlPath(activePath)}";
+            lblChannelVisual.Text = $"Path: {DescribeActivePath()}";
         }
 
         var pidEnabled = (fcConnected || _simulationMode) && !_channelTestRunning;
@@ -1078,7 +1088,10 @@ public sealed partial class MainForm : Form
     private void InitializePidWorkflow()
     {
         lblActiveAxis.Text = "N/A";
-        UpdatePidSnapshotPanel(null, null, null, null, null, null);
+        UpdatePidSnapshotPanel(
+            null, null, null, null,
+            null, null, null, null,
+            null, null, null, null);
         if (cmbManualAxis.Items.Count > 0 && cmbManualAxis.SelectedIndex < 0)
         {
             cmbManualAxis.SelectedIndex = 0;
@@ -1092,6 +1105,21 @@ public sealed partial class MainForm : Form
         if (cmbManualPoints.Items.Count > 0 && cmbManualPoints.SelectedIndex < 0)
         {
             cmbManualPoints.SelectedIndex = 0;
+        }
+
+        if (cmbManualAxis2.Items.Count > 0 && cmbManualAxis2.SelectedIndex < 0)
+        {
+            cmbManualAxis2.SelectedIndex = 0;
+        }
+
+        if (cmbManualGain2.Items.Count > 0 && cmbManualGain2.SelectedIndex < 0)
+        {
+            cmbManualGain2.SelectedIndex = 0;
+        }
+
+        if (cmbManualPoints2.Items.Count > 0 && cmbManualPoints2.SelectedIndex < 0)
+        {
+            cmbManualPoints2.SelectedIndex = 0;
         }
         UpdateWorkflowUiState();
     }
@@ -1385,11 +1413,16 @@ public sealed partial class MainForm : Form
         btnApplyRecommendedPid.Enabled = enabled;
         btnManualPidMinus.Enabled = enabled;
         btnManualPidPlus.Enabled = enabled;
+        btnManualPidMinus2.Enabled = enabled;
+        btnManualPidPlus2.Enabled = enabled;
         btnReadFcPid.Enabled = enabled;
         btnSaveFcPid.Enabled = enabled;
         cmbManualAxis.Enabled = enabled;
         cmbManualGain.Enabled = enabled;
         cmbManualPoints.Enabled = enabled;
+        cmbManualAxis2.Enabled = enabled;
+        cmbManualGain2.Enabled = enabled;
+        cmbManualPoints2.Enabled = enabled;
     }
 
     private void ApplyRecommendedPid()
@@ -1428,15 +1461,20 @@ public sealed partial class MainForm : Form
 
     private void SendManualPidAdjustment(string direction)
     {
+        SendManualPidAdjustmentFrom(cmbManualAxis, cmbManualGain, cmbManualPoints, direction);
+    }
+
+    private void SendManualPidAdjustmentFrom(ComboBox axisCombo, ComboBox gainCombo, ComboBox pointsCombo, string direction)
+    {
         if (!_serialPortService.IsConnected && !_simulationMode)
         {
             MessageBox.Show(this, "Connect FC USB first.", "Manual PID", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        var axis = (cmbManualAxis.SelectedItem?.ToString() ?? "Roll").Trim().ToLowerInvariant();
-        var gain = (cmbManualGain.SelectedItem?.ToString() ?? "P").Trim().ToLowerInvariant();
-        var pointsRaw = cmbManualPoints.SelectedItem?.ToString() ?? "1";
+        var axis = (axisCombo.SelectedItem?.ToString() ?? "Roll").Trim().ToLowerInvariant();
+        var gain = (gainCombo.SelectedItem?.ToString() ?? "P").Trim().ToLowerInvariant();
+        var pointsRaw = pointsCombo.SelectedItem?.ToString() ?? "1";
         if (!int.TryParse(pointsRaw, out var points))
         {
             points = 1;
@@ -1470,13 +1508,7 @@ public sealed partial class MainForm : Form
 
         try
         {
-            var rp = GetPidSettingInt("mc_p_roll");
-            var ri = GetPidSettingInt("mc_i_roll");
-            var rd = GetPidSettingInt("mc_d_roll");
-            var pp = GetPidSettingInt("mc_p_pitch");
-            var pi = GetPidSettingInt("mc_i_pitch");
-            var pd = GetPidSettingInt("mc_d_pitch");
-            UpdatePidSnapshotPanel(rp, ri, rd, pp, pi, pd);
+            RefreshPidSnapshotFromFc();
             lblFCStatus.Text = _simulationMode ? "Read PID values from simulator." : "Read PID values from FC.";
         }
         catch (Exception ex)
@@ -1495,6 +1527,7 @@ public sealed partial class MainForm : Form
         }
         try
         {
+            WritePidGridValuesToFc();
             SavePidSettings();
             lblFCStatus.Text = _simulationMode ? "Saved current PID values to simulator." : "Saved current PID values to FC.";
             RefreshPidSnapshotFromFc();
@@ -1526,33 +1559,122 @@ public sealed partial class MainForm : Form
     {
         if (!_serialPortService.IsConnected && !_simulationMode)
         {
-            UpdatePidSnapshotPanel(null, null, null, null, null, null);
+            UpdatePidSnapshotPanel(
+                null, null, null, null,
+                null, null, null, null,
+                null, null, null, null);
             return;
         }
+        var rp = TryGetPidSettingInt("mc_p_roll");
+        var ri = TryGetPidSettingInt("mc_i_roll");
+        var rd = TryGetPidSettingInt("mc_d_roll");
+        var rf = TryGetPidSettingInt("mc_ff_roll");
+        var pp = TryGetPidSettingInt("mc_p_pitch");
+        var pi = TryGetPidSettingInt("mc_i_pitch");
+        var pd = TryGetPidSettingInt("mc_d_pitch");
+        var pf = TryGetPidSettingInt("mc_ff_pitch");
+        var yp = TryGetPidSettingInt("mc_p_yaw");
+        var yi = TryGetPidSettingInt("mc_i_yaw");
+        var yd = TryGetPidSettingInt("mc_d_yaw");
+        var yf = TryGetPidSettingInt("mc_ff_yaw");
+
+        UpdatePidSnapshotPanel(
+            rp, ri, rd, rf,
+            pp, pi, pd, pf,
+            yp, yi, yd, yf);
+    }
+
+    private void UpdatePidSnapshotPanel(
+        int? rollP, int? rollI, int? rollD, int? rollFf,
+        int? pitchP, int? pitchI, int? pitchD, int? pitchFf,
+        int? yawP, int? yawI, int? yawD, int? yawFf)
+    {
+        txtRollP.Text = rollP?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtRollI.Text = rollI?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtRollD.Text = rollD?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtRollFf.Text = rollFf?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtPitchP.Text = pitchP?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtPitchI.Text = pitchI?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtPitchD.Text = pitchD?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtPitchFf.Text = pitchFf?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtYawP.Text = yawP?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtYawI.Text = yawI?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtYawD.Text = yawD?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        txtYawFf.Text = yawFf?.ToString(CultureInfo.InvariantCulture) ?? "--";
+    }
+
+    private int? TryGetPidSettingInt(string settingName)
+    {
         try
         {
-            var rp = GetPidSettingInt("mc_p_roll");
-            var ri = GetPidSettingInt("mc_i_roll");
-            var rd = GetPidSettingInt("mc_d_roll");
-            var pp = GetPidSettingInt("mc_p_pitch");
-            var pi = GetPidSettingInt("mc_i_pitch");
-            var pd = GetPidSettingInt("mc_d_pitch");
-            UpdatePidSnapshotPanel(rp, ri, rd, pp, pi, pd);
+            return GetPidSettingInt(settingName);
         }
         catch
         {
-            UpdatePidSnapshotPanel(null, null, null, null, null, null);
+            return null;
         }
     }
 
-    private void UpdatePidSnapshotPanel(int? rollP, int? rollI, int? rollD, int? pitchP, int? pitchI, int? pitchD)
+    private void WritePidGridValuesToFc()
     {
-        var rp = rollP?.ToString(CultureInfo.InvariantCulture) ?? "--";
-        var ri = rollI?.ToString(CultureInfo.InvariantCulture) ?? "--";
-        var rd = rollD?.ToString(CultureInfo.InvariantCulture) ?? "--";
-        var pp = pitchP?.ToString(CultureInfo.InvariantCulture) ?? "--";
-        var pi = pitchI?.ToString(CultureInfo.InvariantCulture) ?? "--";
-        var pd = pitchD?.ToString(CultureInfo.InvariantCulture) ?? "--";
+        WritePidGridCell("mc_p_roll", txtRollP.Text);
+        WritePidGridCell("mc_i_roll", txtRollI.Text);
+        WritePidGridCell("mc_d_roll", txtRollD.Text);
+        WritePidGridCell("mc_ff_roll", txtRollFf.Text);
+        WritePidGridCell("mc_p_pitch", txtPitchP.Text);
+        WritePidGridCell("mc_i_pitch", txtPitchI.Text);
+        WritePidGridCell("mc_d_pitch", txtPitchD.Text);
+        WritePidGridCell("mc_ff_pitch", txtPitchFf.Text);
+        WritePidGridCell("mc_p_yaw", txtYawP.Text);
+        WritePidGridCell("mc_i_yaw", txtYawI.Text);
+        WritePidGridCell("mc_d_yaw", txtYawD.Text);
+        WritePidGridCell("mc_ff_yaw", txtYawFf.Text);
+    }
+
+    private void WritePidGridCell(string settingName, string valueText)
+    {
+        if (!int.TryParse(valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+        {
+            return;
+        }
+
+        try
+        {
+            _ = SetPidSettingInt(settingName, value);
+        }
+        catch
+        {
+            // Some FC targets may not expose every key (e.g., ff/yaw).
+        }
+    }
+
+    private void SetPidGridEditable(bool editable)
+    {
+        _pidGridEditable = editable;
+        var readOnly = !editable;
+        txtRollP.ReadOnly = readOnly;
+        txtRollI.ReadOnly = readOnly;
+        txtRollD.ReadOnly = readOnly;
+        txtRollFf.ReadOnly = readOnly;
+        txtPitchP.ReadOnly = readOnly;
+        txtPitchI.ReadOnly = readOnly;
+        txtPitchD.ReadOnly = readOnly;
+        txtPitchFf.ReadOnly = readOnly;
+        txtYawP.ReadOnly = readOnly;
+        txtYawI.ReadOnly = readOnly;
+        txtYawD.ReadOnly = readOnly;
+        txtYawFf.ReadOnly = readOnly;
+
+        if (_pidGridEditable)
+        {
+            btnPidEditable.UseVisualStyleBackColor = false;
+            btnPidEditable.BackColor = Color.LightGreen;
+        }
+        else
+        {
+            btnPidEditable.UseVisualStyleBackColor = true;
+            btnPidEditable.BackColor = SystemColors.Control;
+        }
     }
 
     private void RetestActiveAxis()
@@ -1749,8 +1871,11 @@ public sealed partial class MainForm : Form
     private void btnApplyRecommendedPid_Click(object sender, EventArgs e) => ApplyRecommendedPid();
     private void btnManualPidMinus_Click(object sender, EventArgs e) => SendManualPidAdjustment("decrease");
     private void btnManualPidPlus_Click(object sender, EventArgs e) => SendManualPidAdjustment("increase");
+    private void btnManualPidMinus2_Click(object sender, EventArgs e) => SendManualPidAdjustmentFrom(cmbManualAxis2, cmbManualGain2, cmbManualPoints2, "decrease");
+    private void btnManualPidPlus2_Click(object sender, EventArgs e) => SendManualPidAdjustmentFrom(cmbManualAxis2, cmbManualGain2, cmbManualPoints2, "increase");
     private void btnReadFcPid_Click(object sender, EventArgs e) => ReadFcPidValues();
     private void btnSaveFcPid_Click(object sender, EventArgs e) => SaveFcPidValues();
+    private void btnPidEditable_Click(object sender, EventArgs e) => SetPidGridEditable(!_pidGridEditable);
     private void pnlScoreChart_Paint(object sender, PaintEventArgs e) => DrawScoreChart(e.Graphics, pnlScoreChart.ClientRectangle);
 
     private void lblActiveAxisTitle_Click(object sender, EventArgs e)

@@ -78,6 +78,27 @@ partial class MainForm
         lblBaselineSec = new Label();
         nudBaselineSec = new NumericUpDown();
         grpPidWorkflow = new GroupBox();
+        tblPidMatrix = new TableLayoutPanel();
+        lblPidHdrP = new Label();
+        lblPidHdrI = new Label();
+        lblPidHdrD = new Label();
+        lblPidHdrFf = new Label();
+        lblPidRowRoll = new Label();
+        lblPidRowPitch = new Label();
+        lblPidRowYaw = new Label();
+        txtRollP = new TextBox();
+        txtRollI = new TextBox();
+        txtRollD = new TextBox();
+        txtRollFf = new TextBox();
+        txtPitchP = new TextBox();
+        txtPitchI = new TextBox();
+        txtPitchD = new TextBox();
+        txtPitchFf = new TextBox();
+        txtYawP = new TextBox();
+        txtYawI = new TextBox();
+        txtYawD = new TextBox();
+        txtYawFf = new TextBox();
+        btnPidEditable = new Button();
         btnTuneRoll = new Button();
         lblActiveAxis = new Label();
         lblActiveAxisTitle = new Label();
@@ -91,6 +112,11 @@ partial class MainForm
         cmbManualPoints = new ComboBox();
         btnManualPidMinus = new Button();
         btnManualPidPlus = new Button();
+        cmbManualAxis2 = new ComboBox();
+        cmbManualGain2 = new ComboBox();
+        cmbManualPoints2 = new ComboBox();
+        btnManualPidMinus2 = new Button();
+        btnManualPidPlus2 = new Button();
         btnReadFcPid = new Button();
         btnSaveFcPid = new Button();
         pnlScoreChart = new Panel();
@@ -113,6 +139,7 @@ partial class MainForm
         ((System.ComponentModel.ISupportInitialize)nudSettleSec).BeginInit();
         ((System.ComponentModel.ISupportInitialize)nudBaselineSec).BeginInit();
         grpPidWorkflow.SuspendLayout();
+        tblPidMatrix.SuspendLayout();
         SuspendLayout();
         // 
         // rootLayout
@@ -133,8 +160,8 @@ partial class MainForm
         rootLayout.Padding = new Padding(10);
         rootLayout.RowCount = 3;
         rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 22.3060341F));
-        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 15.625F));
-        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 62.0689659F));
+        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 18.64224F));
+        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 59.0517235F));
         rootLayout.Size = new Size(1532, 948);
         rootLayout.TabIndex = 0;
         // 
@@ -519,7 +546,7 @@ partial class MainForm
         pnlSticks.Controls.Add(pnlRightStick);
         pnlSticks.Location = new Point(99, 30);
         pnlSticks.Name = "pnlSticks";
-        pnlSticks.Size = new Size(323, 103);
+        pnlSticks.Size = new Size(333, 103);
         pnlSticks.TabIndex = 2;
         // 
         // pnlLeftStick
@@ -587,7 +614,7 @@ partial class MainForm
         lblChannelVisual.Anchor = AnchorStyles.Left;
         lblChannelVisual.Location = new Point(55, 7);
         lblChannelVisual.Name = "lblChannelVisual";
-        lblChannelVisual.Size = new Size(26, 15);
+        lblChannelVisual.Size = new Size(129, 25);
         lblChannelVisual.TabIndex = 1;
         lblChannelVisual.Text = "Idle";
         // 
@@ -769,28 +796,258 @@ partial class MainForm
         // 
         // grpPidWorkflow
         // 
-        grpPidWorkflow.Controls.Add(btnTuneRoll);
-        grpPidWorkflow.Controls.Add(lblActiveAxis);
-        grpPidWorkflow.Controls.Add(lblActiveAxisTitle);
-        grpPidWorkflow.Controls.Add(btnTunePitch);
-        grpPidWorkflow.Controls.Add(btnRetestAxis);
-        grpPidWorkflow.Controls.Add(lblPidValuesTitle);
-        grpPidWorkflow.Controls.Add(btnFinishAxis);
-        grpPidWorkflow.Controls.Add(btnApplyRecommendedPid);
-        grpPidWorkflow.Controls.Add(cmbManualAxis);
-        grpPidWorkflow.Controls.Add(cmbManualGain);
-        grpPidWorkflow.Controls.Add(cmbManualPoints);
-        grpPidWorkflow.Controls.Add(btnManualPidMinus);
-        grpPidWorkflow.Controls.Add(btnManualPidPlus);
-        grpPidWorkflow.Controls.Add(btnReadFcPid);
-        grpPidWorkflow.Controls.Add(btnSaveFcPid);
+        grpPidWorkflow.Controls.Add(tblPidMatrix);
+        grpPidWorkflow.Dock = DockStyle.Fill;
         grpPidWorkflow.Location = new Point(13, 220);
         grpPidWorkflow.Name = "grpPidWorkflow";
         grpPidWorkflow.Padding = new Padding(10);
-        grpPidWorkflow.Size = new Size(428, 139);
+        grpPidWorkflow.Size = new Size(557, 167);
         grpPidWorkflow.TabIndex = 2;
         grpPidWorkflow.TabStop = false;
         grpPidWorkflow.Text = "INAV PID / FF Adjustment";
+        // 
+        // tblPidMatrix
+        // 
+        tblPidMatrix.ColumnCount = 6;
+        tblPidMatrix.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 26F));
+        tblPidMatrix.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 14F));
+        tblPidMatrix.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 14F));
+        tblPidMatrix.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 14F));
+        tblPidMatrix.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 14F));
+        tblPidMatrix.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F));
+        tblPidMatrix.Controls.Add(lblPidHdrP, 1, 0);
+        tblPidMatrix.Controls.Add(lblPidHdrI, 2, 0);
+        tblPidMatrix.Controls.Add(lblPidHdrD, 3, 0);
+        tblPidMatrix.Controls.Add(lblPidHdrFf, 4, 0);
+        tblPidMatrix.Controls.Add(lblPidRowRoll, 0, 1);
+        tblPidMatrix.Controls.Add(lblPidRowPitch, 0, 2);
+        tblPidMatrix.Controls.Add(lblPidRowYaw, 0, 3);
+        tblPidMatrix.Controls.Add(txtRollP, 1, 1);
+        tblPidMatrix.Controls.Add(txtRollI, 2, 1);
+        tblPidMatrix.Controls.Add(txtRollD, 3, 1);
+        tblPidMatrix.Controls.Add(txtRollFf, 4, 1);
+        tblPidMatrix.Controls.Add(txtPitchP, 1, 2);
+        tblPidMatrix.Controls.Add(txtPitchI, 2, 2);
+        tblPidMatrix.Controls.Add(txtPitchD, 3, 2);
+        tblPidMatrix.Controls.Add(txtPitchFf, 4, 2);
+        tblPidMatrix.Controls.Add(txtYawP, 1, 3);
+        tblPidMatrix.Controls.Add(txtYawI, 2, 3);
+        tblPidMatrix.Controls.Add(txtYawD, 3, 3);
+        tblPidMatrix.Controls.Add(txtYawFf, 4, 3);
+        tblPidMatrix.Controls.Add(btnReadFcPid, 5, 1);
+        tblPidMatrix.Controls.Add(btnPidEditable, 5, 2);
+        tblPidMatrix.Controls.Add(btnSaveFcPid, 5, 3);
+        tblPidMatrix.Dock = DockStyle.Fill;
+        tblPidMatrix.Location = new Point(10, 26);
+        tblPidMatrix.Name = "tblPidMatrix";
+        tblPidMatrix.RowCount = 4;
+        tblPidMatrix.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+        tblPidMatrix.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+        tblPidMatrix.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+        tblPidMatrix.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+        tblPidMatrix.Size = new Size(537, 131);
+        tblPidMatrix.TabIndex = 0;
+        // 
+        // lblPidHdrP
+        // 
+        lblPidHdrP.Anchor = AnchorStyles.None;
+        lblPidHdrP.AutoSize = true;
+        lblPidHdrP.Location = new Point(198, 8);
+        lblPidHdrP.Name = "lblPidHdrP";
+        lblPidHdrP.Size = new Size(14, 15);
+        lblPidHdrP.TabIndex = 0;
+        lblPidHdrP.Text = "P";
+        // 
+        // lblPidHdrI
+        // 
+        lblPidHdrI.Anchor = AnchorStyles.None;
+        lblPidHdrI.AutoSize = true;
+        lblPidHdrI.Location = new Point(291, 8);
+        lblPidHdrI.Name = "lblPidHdrI";
+        lblPidHdrI.Size = new Size(9, 15);
+        lblPidHdrI.TabIndex = 1;
+        lblPidHdrI.Text = "I";
+        // 
+        // lblPidHdrD
+        // 
+        lblPidHdrD.Anchor = AnchorStyles.None;
+        lblPidHdrD.AutoSize = true;
+        lblPidHdrD.Location = new Point(384, 8);
+        lblPidHdrD.Name = "lblPidHdrD";
+        lblPidHdrD.Size = new Size(15, 15);
+        lblPidHdrD.TabIndex = 2;
+        lblPidHdrD.Text = "D";
+        // 
+        // lblPidHdrFf
+        // 
+        lblPidHdrFf.Anchor = AnchorStyles.None;
+        lblPidHdrFf.AutoSize = true;
+        lblPidHdrFf.Location = new Point(472, 8);
+        lblPidHdrFf.Name = "lblPidHdrFf";
+        lblPidHdrFf.Size = new Size(18, 15);
+        lblPidHdrFf.TabIndex = 3;
+        lblPidHdrFf.Text = "FF";
+        // 
+        // lblPidRowRoll
+        // 
+        lblPidRowRoll.Anchor = AnchorStyles.Left;
+        lblPidRowRoll.AutoSize = true;
+        lblPidRowRoll.Location = new Point(3, 40);
+        lblPidRowRoll.Name = "lblPidRowRoll";
+        lblPidRowRoll.Size = new Size(27, 15);
+        lblPidRowRoll.TabIndex = 4;
+        lblPidRowRoll.Text = "Roll";
+        // 
+        // lblPidRowPitch
+        // 
+        lblPidRowPitch.Anchor = AnchorStyles.Left;
+        lblPidRowPitch.AutoSize = true;
+        lblPidRowPitch.Location = new Point(3, 72);
+        lblPidRowPitch.Name = "lblPidRowPitch";
+        lblPidRowPitch.Size = new Size(34, 15);
+        lblPidRowPitch.TabIndex = 5;
+        lblPidRowPitch.Text = "Pitch";
+        // 
+        // lblPidRowYaw
+        // 
+        lblPidRowYaw.Anchor = AnchorStyles.Left;
+        lblPidRowYaw.AutoSize = true;
+        lblPidRowYaw.Location = new Point(3, 105);
+        lblPidRowYaw.Name = "lblPidRowYaw";
+        lblPidRowYaw.Size = new Size(30, 15);
+        lblPidRowYaw.TabIndex = 6;
+        lblPidRowYaw.Text = "Yaw";
+        // 
+        // txtRollP
+        // 
+        txtRollP.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtRollP.Location = new Point(164, 36);
+        txtRollP.Name = "txtRollP";
+        txtRollP.ReadOnly = true;
+        txtRollP.Size = new Size(87, 23);
+        txtRollP.TabIndex = 7;
+        txtRollP.Text = "0";
+        // 
+        // txtRollI
+        // 
+        txtRollI.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtRollI.Location = new Point(257, 36);
+        txtRollI.Name = "txtRollI";
+        txtRollI.ReadOnly = true;
+        txtRollI.Size = new Size(87, 23);
+        txtRollI.TabIndex = 8;
+        txtRollI.Text = "0";
+        // 
+        // txtRollD
+        // 
+        txtRollD.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtRollD.Location = new Point(350, 36);
+        txtRollD.Name = "txtRollD";
+        txtRollD.ReadOnly = true;
+        txtRollD.Size = new Size(87, 23);
+        txtRollD.TabIndex = 9;
+        txtRollD.Text = "0";
+        // 
+        // txtRollFf
+        // 
+        txtRollFf.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtRollFf.Location = new Point(443, 36);
+        txtRollFf.Name = "txtRollFf";
+        txtRollFf.ReadOnly = true;
+        txtRollFf.Size = new Size(91, 23);
+        txtRollFf.TabIndex = 10;
+        txtRollFf.Text = "0";
+        // 
+        // txtPitchP
+        // 
+        txtPitchP.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtPitchP.Location = new Point(164, 68);
+        txtPitchP.Name = "txtPitchP";
+        txtPitchP.ReadOnly = true;
+        txtPitchP.Size = new Size(87, 23);
+        txtPitchP.TabIndex = 11;
+        txtPitchP.Text = "0";
+        // 
+        // txtPitchI
+        // 
+        txtPitchI.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtPitchI.Location = new Point(257, 68);
+        txtPitchI.Name = "txtPitchI";
+        txtPitchI.ReadOnly = true;
+        txtPitchI.Size = new Size(87, 23);
+        txtPitchI.TabIndex = 12;
+        txtPitchI.Text = "0";
+        // 
+        // txtPitchD
+        // 
+        txtPitchD.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtPitchD.Location = new Point(350, 68);
+        txtPitchD.Name = "txtPitchD";
+        txtPitchD.ReadOnly = true;
+        txtPitchD.Size = new Size(87, 23);
+        txtPitchD.TabIndex = 13;
+        txtPitchD.Text = "0";
+        // 
+        // txtPitchFf
+        // 
+        txtPitchFf.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtPitchFf.Location = new Point(443, 68);
+        txtPitchFf.Name = "txtPitchFf";
+        txtPitchFf.ReadOnly = true;
+        txtPitchFf.Size = new Size(91, 23);
+        txtPitchFf.TabIndex = 14;
+        txtPitchFf.Text = "0";
+        // 
+        // txtYawP
+        // 
+        txtYawP.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtYawP.Location = new Point(164, 101);
+        txtYawP.Name = "txtYawP";
+        txtYawP.ReadOnly = true;
+        txtYawP.Size = new Size(87, 23);
+        txtYawP.TabIndex = 15;
+        txtYawP.Text = "0";
+        // 
+        // txtYawI
+        // 
+        txtYawI.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtYawI.Location = new Point(257, 101);
+        txtYawI.Name = "txtYawI";
+        txtYawI.ReadOnly = true;
+        txtYawI.Size = new Size(87, 23);
+        txtYawI.TabIndex = 16;
+        txtYawI.Text = "0";
+        // 
+        // txtYawD
+        // 
+        txtYawD.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtYawD.Location = new Point(350, 101);
+        txtYawD.Name = "txtYawD";
+        txtYawD.ReadOnly = true;
+        txtYawD.Size = new Size(87, 23);
+        txtYawD.TabIndex = 17;
+        txtYawD.Text = "0";
+        // 
+        // txtYawFf
+        // 
+        txtYawFf.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtYawFf.Location = new Point(443, 101);
+        txtYawFf.Name = "txtYawFf";
+        txtYawFf.ReadOnly = true;
+        txtYawFf.Size = new Size(91, 23);
+        txtYawFf.TabIndex = 18;
+        txtYawFf.Text = "0";
+        // 
+        // btnPidEditable
+        // 
+        btnPidEditable.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        btnPidEditable.Location = new Point(442, 67);
+        btnPidEditable.Name = "btnPidEditable";
+        btnPidEditable.Size = new Size(92, 25);
+        btnPidEditable.TabIndex = 20;
+        btnPidEditable.Text = "Editable";
+        btnPidEditable.UseVisualStyleBackColor = true;
+        btnPidEditable.Click += btnPidEditable_Click;
         // 
         // btnTuneRoll
         // 
@@ -805,7 +1062,7 @@ partial class MainForm
         // lblActiveAxis
         // 
         lblActiveAxis.Anchor = AnchorStyles.Left;
-        lblActiveAxis.Location = new Point(559, 108);
+        lblActiveAxis.Location = new Point(559, 104);
         lblActiveAxis.Name = "lblActiveAxis";
         lblActiveAxis.Size = new Size(48, 15);
         lblActiveAxis.TabIndex = 2;
@@ -814,7 +1071,7 @@ partial class MainForm
         // lblActiveAxisTitle
         // 
         lblActiveAxisTitle.Anchor = AnchorStyles.Left;
-        lblActiveAxisTitle.Location = new Point(481, 108);
+        lblActiveAxisTitle.Location = new Point(481, 104);
         lblActiveAxisTitle.Name = "lblActiveAxisTitle";
         lblActiveAxisTitle.Size = new Size(75, 15);
         lblActiveAxisTitle.TabIndex = 1;
@@ -844,7 +1101,7 @@ partial class MainForm
         // lblPidValuesTitle
         // 
         lblPidValuesTitle.Anchor = AnchorStyles.Left;
-        lblPidValuesTitle.Location = new Point(18, 16);
+        lblPidValuesTitle.Location = new Point(248, 40);
         lblPidValuesTitle.Name = "lblPidValuesTitle";
         lblPidValuesTitle.Size = new Size(140, 15);
         lblPidValuesTitle.TabIndex = 4;
@@ -920,23 +1177,75 @@ partial class MainForm
         btnManualPidPlus.UseVisualStyleBackColor = true;
         btnManualPidPlus.Click += btnManualPidPlus_Click;
         // 
+        // cmbManualAxis2
+        // 
+        cmbManualAxis2.DropDownStyle = ComboBoxStyle.DropDownList;
+        cmbManualAxis2.FormattingEnabled = true;
+        cmbManualAxis2.Items.AddRange(new object[] { "Roll", "Pitch" });
+        cmbManualAxis2.Location = new Point(18, 106);
+        cmbManualAxis2.Name = "cmbManualAxis2";
+        cmbManualAxis2.Size = new Size(80, 23);
+        cmbManualAxis2.TabIndex = 12;
+        // 
+        // cmbManualGain2
+        // 
+        cmbManualGain2.DropDownStyle = ComboBoxStyle.DropDownList;
+        cmbManualGain2.FormattingEnabled = true;
+        cmbManualGain2.Items.AddRange(new object[] { "P", "I", "D" });
+        cmbManualGain2.Location = new Point(104, 106);
+        cmbManualGain2.Name = "cmbManualGain2";
+        cmbManualGain2.Size = new Size(56, 23);
+        cmbManualGain2.TabIndex = 13;
+        // 
+        // cmbManualPoints2
+        // 
+        cmbManualPoints2.DropDownStyle = ComboBoxStyle.DropDownList;
+        cmbManualPoints2.FormattingEnabled = true;
+        cmbManualPoints2.Items.AddRange(new object[] { "1", "2", "3", "4", "5" });
+        cmbManualPoints2.Location = new Point(166, 106);
+        cmbManualPoints2.Name = "cmbManualPoints2";
+        cmbManualPoints2.Size = new Size(58, 23);
+        cmbManualPoints2.TabIndex = 14;
+        // 
+        // btnManualPidMinus2
+        // 
+        btnManualPidMinus2.Location = new Point(230, 103);
+        btnManualPidMinus2.Name = "btnManualPidMinus2";
+        btnManualPidMinus2.Size = new Size(82, 32);
+        btnManualPidMinus2.TabIndex = 15;
+        btnManualPidMinus2.Text = "PID -";
+        btnManualPidMinus2.UseVisualStyleBackColor = true;
+        btnManualPidMinus2.Click += btnManualPidMinus2_Click;
+        // 
+        // btnManualPidPlus2
+        // 
+        btnManualPidPlus2.Location = new Point(318, 103);
+        btnManualPidPlus2.Name = "btnManualPidPlus2";
+        btnManualPidPlus2.Size = new Size(82, 32);
+        btnManualPidPlus2.TabIndex = 16;
+        btnManualPidPlus2.Text = "PID +";
+        btnManualPidPlus2.UseVisualStyleBackColor = true;
+        btnManualPidPlus2.Click += btnManualPidPlus2_Click;
+        // 
         // btnReadFcPid
         // 
-        btnReadFcPid.Location = new Point(430, 80);
+        btnReadFcPid.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        btnReadFcPid.Location = new Point(442, 35);
         btnReadFcPid.Name = "btnReadFcPid";
-        btnReadFcPid.Size = new Size(170, 34);
-        btnReadFcPid.TabIndex = 10;
+        btnReadFcPid.Size = new Size(92, 25);
+        btnReadFcPid.TabIndex = 19;
         btnReadFcPid.Text = "Read FC";
         btnReadFcPid.UseVisualStyleBackColor = true;
         btnReadFcPid.Click += btnReadFcPid_Click;
         // 
         // btnSaveFcPid
         // 
-        btnSaveFcPid.Location = new Point(430, 121);
+        btnSaveFcPid.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        btnSaveFcPid.Location = new Point(442, 100);
         btnSaveFcPid.Name = "btnSaveFcPid";
-        btnSaveFcPid.Size = new Size(170, 34);
-        btnSaveFcPid.TabIndex = 11;
-        btnSaveFcPid.Text = "Save to FC";
+        btnSaveFcPid.Size = new Size(92, 25);
+        btnSaveFcPid.TabIndex = 21;
+        btnSaveFcPid.Text = "Write FC";
         btnSaveFcPid.UseVisualStyleBackColor = true;
         btnSaveFcPid.Click += btnSaveFcPid_Click;
         // 
@@ -946,9 +1255,9 @@ partial class MainForm
         pnlScoreChart.BorderStyle = BorderStyle.FixedSingle;
         rootLayout.SetColumnSpan(pnlScoreChart, 3);
         pnlScoreChart.Dock = DockStyle.Fill;
-        pnlScoreChart.Location = new Point(13, 365);
+        pnlScoreChart.Location = new Point(13, 393);
         pnlScoreChart.Name = "pnlScoreChart";
-        pnlScoreChart.Size = new Size(1506, 570);
+        pnlScoreChart.Size = new Size(1506, 542);
         pnlScoreChart.TabIndex = 0;
         pnlScoreChart.Paint += pnlScoreChart_Paint;
         // 
@@ -1006,6 +1315,8 @@ partial class MainForm
         ((System.ComponentModel.ISupportInitialize)nudThrottleUs).EndInit();
         ((System.ComponentModel.ISupportInitialize)nudSettleSec).EndInit();
         ((System.ComponentModel.ISupportInitialize)nudBaselineSec).EndInit();
+        tblPidMatrix.ResumeLayout(false);
+        tblPidMatrix.PerformLayout();
         grpPidWorkflow.ResumeLayout(false);
         ResumeLayout(false);
     }
@@ -1041,6 +1352,27 @@ partial class MainForm
     private Button btnPresetReat;
     private GroupBox grpChannelTest;
     private GroupBox grpPidWorkflow;
+    private TableLayoutPanel tblPidMatrix;
+    private Label lblPidHdrP;
+    private Label lblPidHdrI;
+    private Label lblPidHdrD;
+    private Label lblPidHdrFf;
+    private Label lblPidRowRoll;
+    private Label lblPidRowPitch;
+    private Label lblPidRowYaw;
+    private TextBox txtRollP;
+    private TextBox txtRollI;
+    private TextBox txtRollD;
+    private TextBox txtRollFf;
+    private TextBox txtPitchP;
+    private TextBox txtPitchI;
+    private TextBox txtPitchD;
+    private TextBox txtPitchFf;
+    private TextBox txtYawP;
+    private TextBox txtYawI;
+    private TextBox txtYawD;
+    private TextBox txtYawFf;
+    private Button btnPidEditable;
     private Button btnTuneRoll;
     private Button btnTunePitch;
     private Button btnRetestAxis;
@@ -1051,6 +1383,11 @@ partial class MainForm
     private ComboBox cmbManualPoints;
     private Button btnManualPidMinus;
     private Button btnManualPidPlus;
+    private ComboBox cmbManualAxis2;
+    private ComboBox cmbManualGain2;
+    private ComboBox cmbManualPoints2;
+    private Button btnManualPidMinus2;
+    private Button btnManualPidPlus2;
     private Button btnReadFcPid;
     private Button btnSaveFcPid;
     private Label lblActiveAxisTitle;
