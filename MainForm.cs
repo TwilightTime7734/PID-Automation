@@ -32,6 +32,21 @@ public sealed partial class MainForm : Form
     private string? _activeAxis;
     private int _rollIteration;
     private int _pitchIteration;
+    private bool _simulationMode;
+    private readonly Random _simRandom = new();
+    private double _simRollDeg;
+    private double _simPitchDeg;
+    private double _simYawDeg;
+    private DateTime _simLastAttitudeAt = DateTime.UtcNow;
+    private readonly Dictionary<string, int> _simPidSettings = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["mc_p_roll"] = 40,
+        ["mc_i_roll"] = 50,
+        ["mc_d_roll"] = 30,
+        ["mc_p_pitch"] = 40,
+        ["mc_i_pitch"] = 50,
+        ["mc_d_pitch"] = 30,
+    };
     private PidAdjustmentRecommendation? _pendingRecommendation;
     private int _ch1PulseUs = 1500;
     private int _ch2PulseUs = 1500;
@@ -64,7 +79,7 @@ public sealed partial class MainForm : Form
         cboBaud.SelectedIndexChanged += (_, _) => OnFcBaudChanged();
         cboArduinoBaud.SelectedIndexChanged += (_, _) => OnArduinoBaudChanged();
         cboTrainerPin.SelectedIndexChanged += (_, _) => OnTrainerPinChanged();
-        chkSimulation.CheckedChanged += (_, _) => OnSimulationModeChanged();
+        btnSimulationToggle.Click += (_, _) => OnSimulationModeChanged();
         if (cboTrainerPin.Items.Count > 0)
         {
             cboTrainerPin.SelectedItem = DefaultTrainerPin.ToString(CultureInfo.InvariantCulture);
@@ -77,6 +92,7 @@ public sealed partial class MainForm : Form
         cboCH4.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
         InitializePidWorkflow();
         InitializeStickVisuals();
+        UpdateSimulationToggleVisual();
         UpdateSerialConnectionUi();
     }
 
@@ -553,7 +569,7 @@ public sealed partial class MainForm : Form
 
     private void ConnectArduinoUsb()
     {
-        if (chkSimulation.Checked)
+        if (_simulationMode)
         {
             _arduinoConnected = true;
             SetArduinoStatus("Simulation mode active - no Arduino hardware is being used.");
@@ -590,7 +606,7 @@ public sealed partial class MainForm : Form
 
     private void DisconnectArduinoUsb()
     {
-        if (chkSimulation.Checked)
+        if (_simulationMode)
         {
             _arduinoConnected = false;
             SetArduinoStatus("Simulation mode disconnected.");
@@ -629,7 +645,7 @@ public sealed partial class MainForm : Form
         btnFcConnect.Enabled = !_startupScanInProgress && fcPortSelected && !fcSelectedIsConnected;
         btnFcDisconnect.Enabled = fcSelectedIsConnected;
 
-        var simulationEnabled = chkSimulation.Checked;
+        var simulationEnabled = _simulationMode;
         var arduinoPortSelected = cboArduinoPort.SelectedItem is string arduinoPort && !string.IsNullOrWhiteSpace(arduinoPort);
         var arduinoConnectedNow = _arduinoConnected || _arduinoTrainerClient.IsConnected;
         btnArduinoConnect.Enabled = !_startupScanInProgress && (simulationEnabled || arduinoPortSelected) && !arduinoConnectedNow;
@@ -686,7 +702,7 @@ public sealed partial class MainForm : Form
 
     private void OnArduinoBaudChanged()
     {
-        if (chkSimulation.Checked)
+        if (_simulationMode)
         {
             SetArduinoStatus("Simulation mode active.");
             return;
@@ -726,7 +742,7 @@ public sealed partial class MainForm : Form
 
     private void OnTrainerPinChanged()
     {
-        if (chkSimulation.Checked)
+        if (_simulationMode)
         {
             return;
         }
@@ -797,7 +813,7 @@ public sealed partial class MainForm : Form
             lblChannelVisual.Text = $"Path: {DescribeControlPath(activePath)}";
         }
 
-        var pidEnabled = fcConnected && !_channelTestRunning;
+        var pidEnabled = (fcConnected || _simulationMode) && !_channelTestRunning;
         SetPidButtonsEnabled(pidEnabled);
     }
 
@@ -1013,7 +1029,7 @@ public sealed partial class MainForm : Form
 
     private void SetArduinoAxisPulse(string control, int pulseUs)
     {
-        if (chkSimulation.Checked)
+        if (_simulationMode)
         {
             var simAxisCode = AxisCodeForControl(control);
             var simChannel = ChannelFromAxisCode(simAxisCode);
@@ -1034,7 +1050,7 @@ public sealed partial class MainForm : Form
 
     private void CenterArduinoFlightControls()
     {
-        if (chkSimulation.Checked)
+        if (_simulationMode)
         {
             SetChannelPulseState(ChannelFromAxisCode("A"), 1500);
             SetChannelPulseState(ChannelFromAxisCode("E"), 1500);
@@ -1086,7 +1102,7 @@ public sealed partial class MainForm : Form
         {
             return;
         }
-        if (!_serialPortService.IsConnected)
+        if (!_serialPortService.IsConnected && !_simulationMode)
         {
             MessageBox.Show(this, "Connect FC USB first.", "PID Tuning Workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
@@ -1145,7 +1161,7 @@ public sealed partial class MainForm : Form
         var values = new List<double>(sampleCount);
         for (var i = 0; i < sampleCount; i++)
         {
-            var attitude = _serialPortService.ReadAttitude(1.0);
+            var attitude = ReadAttitudeForWorkflow(1.0);
             values.Add(axis == "roll" ? attitude.RollDeg : attitude.PitchDeg);
             await Task.Delay(sampleDelayMs);
         }
@@ -1187,7 +1203,7 @@ public sealed partial class MainForm : Form
 
     private async Task<double> RecordAxisBaselineRateAsync(string axis, double durationSec)
     {
-        var previous = _serialPortService.ReadAttitude(2.0);
+        var previous = ReadAttitudeForWorkflow(2.0);
         var previousAt = DateTime.UtcNow;
         var rates = new List<double>();
         var endAt = DateTime.UtcNow.AddSeconds(durationSec);
@@ -1197,7 +1213,7 @@ public sealed partial class MainForm : Form
         {
             await Task.Delay(50);
             var now = DateTime.UtcNow;
-            var attitude = _serialPortService.ReadAttitude(2.0);
+            var attitude = ReadAttitudeForWorkflow(2.0);
             var dt = Math.Max(0.001, (now - previousAt).TotalSeconds);
             var rate = axis == "roll"
                 ? (attitude.RollDeg - previous.RollDeg) / dt
@@ -1215,7 +1231,7 @@ public sealed partial class MainForm : Form
         var target = Math.Max(1.0, Math.Abs(commandDeg));
         var start = DateTime.UtcNow;
         var stopAt = start.AddSeconds(durationSec);
-        var previous = _serialPortService.ReadAttitude(2.0);
+        var previous = ReadAttitudeForWorkflow(2.0);
         var previousAt = DateTime.UtcNow;
         var referenceAngle = axis == "roll" ? previous.RollDeg : previous.PitchDeg;
         var movementRates = new List<double>();
@@ -1238,7 +1254,7 @@ public sealed partial class MainForm : Form
             {
                 await Task.Delay(50);
                 var now = DateTime.UtcNow;
-                var attitude = _serialPortService.ReadAttitude(2.0);
+                var attitude = ReadAttitudeForWorkflow(2.0);
                 var dt = Math.Max(0.001, (now - previousAt).TotalSeconds);
                 var currentAngle = axis == "roll" ? attitude.RollDeg : attitude.PitchDeg;
                 var previousAngle = axis == "roll" ? previous.RollDeg : previous.PitchDeg;
@@ -1383,7 +1399,7 @@ public sealed partial class MainForm : Form
             MessageBox.Show(this, "No pending PID adjustment to apply.", "PID Tuning Workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-        if (!_serialPortService.IsConnected)
+        if (!_serialPortService.IsConnected && !_simulationMode)
         {
             MessageBox.Show(this, "Connect FC USB first.", "PID Tuning Workflow", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
@@ -1392,13 +1408,13 @@ public sealed partial class MainForm : Form
         try
         {
             var settingName = ResolvePidSettingName(_pendingRecommendation.Axis, _pendingRecommendation.Gain);
-            var current = _serialPortService.GetSettingInt(settingName);
+            var current = GetPidSettingInt(settingName);
             var delta = _pendingRecommendation.Direction.Equals("increase", StringComparison.OrdinalIgnoreCase)
                 ? _pendingRecommendation.Points
                 : -_pendingRecommendation.Points;
             var target = Math.Max(0, Math.Min(255, current + delta));
-            var applied = _serialPortService.SetSettingInt(settingName, target);
-            _serialPortService.SaveSettings();
+            var applied = SetPidSettingInt(settingName, target);
+            SavePidSettings();
 
             lblFCStatus.Text = $"Applied PID: {settingName} {current} -> {applied} and saved.";
             RefreshPidSnapshotFromFc();
@@ -1412,7 +1428,7 @@ public sealed partial class MainForm : Form
 
     private void SendManualPidAdjustment(string direction)
     {
-        if (!_serialPortService.IsConnected)
+        if (!_serialPortService.IsConnected && !_simulationMode)
         {
             MessageBox.Show(this, "Connect FC USB first.", "Manual PID", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
@@ -1430,10 +1446,10 @@ public sealed partial class MainForm : Form
         try
         {
             var settingName = ResolvePidSettingName(axis, gain);
-            var current = _serialPortService.GetSettingInt(settingName);
+            var current = GetPidSettingInt(settingName);
             var delta = direction.Equals("increase", StringComparison.OrdinalIgnoreCase) ? points : -points;
             var target = Math.Max(0, Math.Min(255, current + delta));
-            var applied = _serialPortService.SetSettingInt(settingName, target);
+            var applied = SetPidSettingInt(settingName, target);
             lblFCStatus.Text = $"Manual PID: {settingName} {current} -> {applied}";
             RefreshPidSnapshotFromFc();
         }
@@ -1446,7 +1462,7 @@ public sealed partial class MainForm : Form
 
     private void ReadFcPidValues()
     {
-        if (!_serialPortService.IsConnected)
+        if (!_serialPortService.IsConnected && !_simulationMode)
         {
             MessageBox.Show(this, "Connect FC USB first.", "Read FC", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
@@ -1454,14 +1470,14 @@ public sealed partial class MainForm : Form
 
         try
         {
-            var rp = _serialPortService.GetSettingInt("mc_p_roll");
-            var ri = _serialPortService.GetSettingInt("mc_i_roll");
-            var rd = _serialPortService.GetSettingInt("mc_d_roll");
-            var pp = _serialPortService.GetSettingInt("mc_p_pitch");
-            var pi = _serialPortService.GetSettingInt("mc_i_pitch");
-            var pd = _serialPortService.GetSettingInt("mc_d_pitch");
+            var rp = GetPidSettingInt("mc_p_roll");
+            var ri = GetPidSettingInt("mc_i_roll");
+            var rd = GetPidSettingInt("mc_d_roll");
+            var pp = GetPidSettingInt("mc_p_pitch");
+            var pi = GetPidSettingInt("mc_i_pitch");
+            var pd = GetPidSettingInt("mc_d_pitch");
             UpdatePidSnapshotPanel(rp, ri, rd, pp, pi, pd);
-            lblFCStatus.Text = "Read PID values from FC.";
+            lblFCStatus.Text = _simulationMode ? "Read PID values from simulator." : "Read PID values from FC.";
         }
         catch (Exception ex)
         {
@@ -1472,15 +1488,15 @@ public sealed partial class MainForm : Form
 
     private void SaveFcPidValues()
     {
-        if (!_serialPortService.IsConnected)
+        if (!_serialPortService.IsConnected && !_simulationMode)
         {
             MessageBox.Show(this, "Connect FC USB first.", "Save FC", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         try
         {
-            _serialPortService.SaveSettings();
-            lblFCStatus.Text = "Saved current PID values to FC.";
+            SavePidSettings();
+            lblFCStatus.Text = _simulationMode ? "Saved current PID values to simulator." : "Saved current PID values to FC.";
             RefreshPidSnapshotFromFc();
         }
         catch (Exception ex)
@@ -1508,19 +1524,19 @@ public sealed partial class MainForm : Form
 
     private void RefreshPidSnapshotFromFc()
     {
-        if (!_serialPortService.IsConnected)
+        if (!_serialPortService.IsConnected && !_simulationMode)
         {
             UpdatePidSnapshotPanel(null, null, null, null, null, null);
             return;
         }
         try
         {
-            var rp = _serialPortService.GetSettingInt("mc_p_roll");
-            var ri = _serialPortService.GetSettingInt("mc_i_roll");
-            var rd = _serialPortService.GetSettingInt("mc_d_roll");
-            var pp = _serialPortService.GetSettingInt("mc_p_pitch");
-            var pi = _serialPortService.GetSettingInt("mc_i_pitch");
-            var pd = _serialPortService.GetSettingInt("mc_d_pitch");
+            var rp = GetPidSettingInt("mc_p_roll");
+            var ri = GetPidSettingInt("mc_i_roll");
+            var rd = GetPidSettingInt("mc_d_roll");
+            var pp = GetPidSettingInt("mc_p_pitch");
+            var pi = GetPidSettingInt("mc_i_pitch");
+            var pd = GetPidSettingInt("mc_d_pitch");
             UpdatePidSnapshotPanel(rp, ri, rd, pp, pi, pd);
         }
         catch
@@ -1630,16 +1646,101 @@ public sealed partial class MainForm : Form
 
     private void OnSimulationModeChanged()
     {
-        if (chkSimulation.Checked && _arduinoTrainerClient.IsConnected)
+        _simulationMode = !_simulationMode;
+
+        if (_simulationMode && _arduinoTrainerClient.IsConnected)
         {
             _arduinoTrainerClient.Disconnect();
         }
 
         _arduinoConnected = false;
-        SetArduinoStatus(chkSimulation.Checked
+        SetArduinoStatus(_simulationMode
             ? "Simulation mode selected."
             : "Arduino not connected.");
+        UpdateSimulationToggleVisual();
         UpdateSerialConnectionUi();
+    }
+
+    private void UpdateSimulationToggleVisual()
+    {
+        btnSimulationToggle.Text = _simulationMode ? "Simulation: On" : "Simulation: Off";
+        if (_simulationMode)
+        {
+            btnSimulationToggle.UseVisualStyleBackColor = false;
+            btnSimulationToggle.BackColor = Color.LightGreen;
+        }
+        else
+        {
+            btnSimulationToggle.UseVisualStyleBackColor = true;
+        }
+    }
+
+    private AttitudeSample ReadAttitudeForWorkflow(double timeoutSeconds)
+    {
+        if (!_simulationMode)
+        {
+            return _serialPortService.ReadAttitude(timeoutSeconds);
+        }
+
+        var targetRoll = (GetDisplayedPulseForAxisCode("A") - 1500.0) / 500.0 * MaxCommandDeg;
+        var targetPitch = (GetDisplayedPulseForAxisCode("E") - 1500.0) / 500.0 * MaxCommandDeg;
+        var targetYaw = (GetDisplayedPulseForAxisCode("R") - 1500.0) / 500.0 * 30.0;
+
+        var now = DateTime.UtcNow;
+        var dt = Math.Max(0.01, (now - _simLastAttitudeAt).TotalSeconds);
+        _simLastAttitudeAt = now;
+
+        // First-order response to emulate inertia.
+        var tau = 0.22;
+        var alpha = Math.Min(1.0, dt / (tau + dt));
+        _simRollDeg += (targetRoll - _simRollDeg) * alpha;
+        _simPitchDeg += (targetPitch - _simPitchDeg) * alpha;
+        _simYawDeg += (targetYaw - _simYawDeg) * alpha;
+
+        // Add small bounded jitter to feel more like live telemetry.
+        var noiseScale = 0.25;
+        var rollNoise = (_simRandom.NextDouble() * 2.0 - 1.0) * noiseScale;
+        var pitchNoise = (_simRandom.NextDouble() * 2.0 - 1.0) * noiseScale;
+        var yawNoise = (_simRandom.NextDouble() * 2.0 - 1.0) * (noiseScale * 0.7);
+
+        return new AttitudeSample
+        {
+            RollDeg = _simRollDeg + rollNoise,
+            PitchDeg = _simPitchDeg + pitchNoise,
+            YawDeg = _simYawDeg + yawNoise,
+        };
+    }
+
+    private int GetPidSettingInt(string settingName)
+    {
+        if (_simulationMode)
+        {
+            return _simPidSettings.TryGetValue(settingName, out var value) ? value : 0;
+        }
+
+        return _serialPortService.GetSettingInt(settingName);
+    }
+
+    private int SetPidSettingInt(string settingName, int value)
+    {
+        var clamped = Math.Max(0, Math.Min(255, value));
+        if (_simulationMode)
+        {
+            _simPidSettings[settingName] = clamped;
+            return clamped;
+        }
+
+        return _serialPortService.SetSettingInt(settingName, clamped);
+    }
+
+    private void SavePidSettings()
+    {
+        if (_simulationMode)
+        {
+            return;
+        }
+
+        _serialPortService.SaveSettings();
     }
     private void btnTuneRoll_Click(object sender, EventArgs e) => _ = RunPidTuningRoundAsync("roll", resetAxis: true);
     private void btnTunePitch_Click(object sender, EventArgs e) => _ = RunPidTuningRoundAsync("pitch", resetAxis: true);
@@ -1653,6 +1754,11 @@ public sealed partial class MainForm : Form
     private void pnlScoreChart_Paint(object sender, PaintEventArgs e) => DrawScoreChart(e.Graphics, pnlScoreChart.ClientRectangle);
 
     private void lblActiveAxisTitle_Click(object sender, EventArgs e)
+    {
+
+    }
+
+    private void lblRoll_Click(object sender, EventArgs e)
     {
 
     }
