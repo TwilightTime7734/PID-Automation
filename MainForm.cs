@@ -28,7 +28,6 @@ public sealed partial class MainForm : Form
     private readonly List<TuningRunRecord> _tuningRuns = new();
     private bool _channelTestRunning;
     private bool _arduinoConnected;
-    private System.Windows.Forms.Timer? _telemetryTimer;
     private bool _startupScanInProgress;
     private string? _activeAxis;
     private int _rollIteration;
@@ -76,7 +75,6 @@ public sealed partial class MainForm : Form
         cboCH2.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
         cboCH3.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
         cboCH4.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
-        InitializeTelemetry();
         InitializePidWorkflow();
         InitializeStickVisuals();
         UpdateSerialConnectionUi();
@@ -549,7 +547,6 @@ public sealed partial class MainForm : Form
 
     private void DisconnectUsb()
     {
-        StopTelemetryLoop("FC not connected.");
         _serialPortService.Disconnect();
         UpdateSerialConnectionUi();
     }
@@ -672,7 +669,6 @@ public sealed partial class MainForm : Form
         {
             try
             {
-                StopTelemetryLoop("Live telemetry stopped for FC baud change.");
                 _serialPortService.Disconnect();
                 _serialPortService.Connect(port, _fcBaudRate);
                 lblFCStatus.Text = $"FC baud changed: {port}@{_fcBaudRate}";
@@ -790,7 +786,6 @@ public sealed partial class MainForm : Form
     private void UpdateWorkflowUiState()
     {
         var fcConnected = _serialPortService.IsConnected;
-        var telemetryRunning = _telemetryTimer?.Enabled == true;
         var activePath = GetActiveControlPath();
         var canRunChannelTests = _arduinoConnected;
 
@@ -801,9 +796,6 @@ public sealed partial class MainForm : Form
             btnTestThrottle.Enabled = canRunChannelTests;
             lblChannelVisual.Text = $"Path: {DescribeControlPath(activePath)}";
         }
-
-        btnTelemetryStart.Enabled = fcConnected && !telemetryRunning;
-        btnTelemetryStop.Enabled = fcConnected && telemetryRunning;
 
         var pidEnabled = fcConnected && !_channelTestRunning;
         SetPidButtonsEnabled(pidEnabled);
@@ -1066,79 +1058,10 @@ public sealed partial class MainForm : Form
         SetChannelPulseState(ChannelFromAxisCode("R"), 1500);
     }
 
-    private void InitializeTelemetry()
-    {
-        _telemetryTimer = new System.Windows.Forms.Timer
-        {
-            Interval = 250,
-        };
-        _telemetryTimer.Tick += (_, _) => PollTelemetrySample();
-        UpdateWorkflowUiState();
-    }
-
-    private void PollTelemetrySample()
-    {
-        if (!_serialPortService.IsConnected)
-        {
-            StopTelemetryLoop("Telemetry stopped: FC USB not connected.");
-            return;
-        }
-        try
-        {
-            var attitude = _serialPortService.ReadAttitude(1.0);
-            ApplyTelemetryVisual(attitude.RollDeg, attitude.PitchDeg, attitude.YawDeg);
-            lblRollAngle.Text = $"{attitude.RollDeg.ToString("F1", CultureInfo.InvariantCulture)} deg";
-            lblPitchAngle.Text = $"{attitude.PitchDeg.ToString("F1", CultureInfo.InvariantCulture)} deg";
-        }
-        catch (Exception ex)
-        {
-            StopTelemetryLoop($"Telemetry read failed: {ex.Message}");
-        }
-    }
-
-    private void ApplyTelemetryVisual(double roll, double pitch, double yaw)
-    {
-        lblTelemetryRoll.Text = $"{roll:F1} deg";
-        lblTelemetryPitch.Text = $"{pitch:F1} deg";
-        lblTelemetryYaw.Text = $"{yaw:F1} deg";
-    }
-
-    private void StartTelemetryLoop()
-    {
-        if (!_serialPortService.IsConnected)
-        {
-            MessageBox.Show(this, "Connect FC USB before starting live telemetry.", "Telemetry unavailable", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
-
-        _telemetryTimer?.Start();
-        UpdateWorkflowUiState();
-        lblFCStatus.Text = "Live telemetry started.";
-    }
-
-    private void StopTelemetryLoop(string statusText = "Live telemetry stopped.")
-    {
-        _telemetryTimer?.Stop();
-        UpdateWorkflowUiState();
-        lblFCStatus.Text = statusText;
-    }
-
-    private void TelemetrySnapshot()
-    {
-        if (!_serialPortService.IsConnected)
-        {
-            MessageBox.Show(this, "Connect FC USB before requesting telemetry snapshot.", "Telemetry unavailable", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
-
-        PollTelemetrySample();
-        lblFCStatus.Text = "Telemetry snapshot updated.";
-    }
 
     private void InitializePidWorkflow()
     {
         lblActiveAxis.Text = "N/A";
-        txtPidRecommendation.Text = "Tune Roll or Pitch to generate a recommendation.";
         UpdatePidSnapshotPanel(null, null, null, null, null, null);
         if (cmbManualAxis.Items.Count > 0 && cmbManualAxis.SelectedIndex < 0)
         {
@@ -1203,7 +1126,6 @@ public sealed partial class MainForm : Form
             var recommendation = BuildRecommendation(axis, score);
             _pendingRecommendation = recommendation;
 
-            txtPidRecommendation.Text = recommendation.Message;
             AppendTuningRun(axis, iteration, score, recommendation);
             lblFCStatus.Text = $"Completed {axis} round {iteration}. Score {score:F2}.";
         }
@@ -1479,7 +1401,6 @@ public sealed partial class MainForm : Form
             _serialPortService.SaveSettings();
 
             lblFCStatus.Text = $"Applied PID: {settingName} {current} -> {applied} and saved.";
-            txtPidRecommendation.Text += $"{Environment.NewLine}{Environment.NewLine}Applied to FC: {settingName} {current} -> {applied}.";
             RefreshPidSnapshotFromFc();
         }
         catch (Exception ex)
@@ -1540,10 +1461,6 @@ public sealed partial class MainForm : Form
             var pi = _serialPortService.GetSettingInt("mc_i_pitch");
             var pd = _serialPortService.GetSettingInt("mc_d_pitch");
             UpdatePidSnapshotPanel(rp, ri, rd, pp, pi, pd);
-            txtPidRecommendation.Text =
-                $"FC PID values:{Environment.NewLine}" +
-                $"Roll P/I/D: {rp}/{ri}/{rd}{Environment.NewLine}" +
-                $"Pitch P/I/D: {pp}/{pi}/{pd}";
             lblFCStatus.Text = "Read PID values from FC.";
         }
         catch (Exception ex)
@@ -1620,7 +1537,6 @@ public sealed partial class MainForm : Form
         var pp = pitchP?.ToString(CultureInfo.InvariantCulture) ?? "--";
         var pi = pitchI?.ToString(CultureInfo.InvariantCulture) ?? "--";
         var pd = pitchD?.ToString(CultureInfo.InvariantCulture) ?? "--";
-        txtPidValues.Text = $"Roll P/I/D: {rp}/{ri}/{rd}{Environment.NewLine}Pitch P/I/D: {pp}/{pi}/{pd}";
     }
 
     private void RetestActiveAxis()
@@ -1637,7 +1553,6 @@ public sealed partial class MainForm : Form
     {
         _activeAxis = null;
         lblActiveAxis.Text = "N/A";
-        txtPidRecommendation.Text = "Axis tuning stopped. Tune Roll or Pitch to continue.";
         lblFCStatus.Text = "Axis tuning finished.";
     }
 
@@ -1688,8 +1603,6 @@ public sealed partial class MainForm : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        _telemetryTimer?.Stop();
-        _telemetryTimer?.Dispose();
         DisconnectArduinoUsb();
         _serialPortService.Dispose();
 
@@ -1728,9 +1641,6 @@ public sealed partial class MainForm : Form
             : "Arduino not connected.");
         UpdateSerialConnectionUi();
     }
-    private void btnTelemetryStart_Click(object sender, EventArgs e) => StartTelemetryLoop();
-    private void btnTelemetryStop_Click(object sender, EventArgs e) => StopTelemetryLoop();
-    private void btnTelemetrySnapshot_Click(object sender, EventArgs e) => TelemetrySnapshot();
     private void btnTuneRoll_Click(object sender, EventArgs e) => _ = RunPidTuningRoundAsync("roll", resetAxis: true);
     private void btnTunePitch_Click(object sender, EventArgs e) => _ = RunPidTuningRoundAsync("pitch", resetAxis: true);
     private void btnRetestAxis_Click(object sender, EventArgs e) => RetestActiveAxis();

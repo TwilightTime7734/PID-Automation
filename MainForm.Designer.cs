@@ -68,15 +68,15 @@ partial class MainForm
         lblRollAngle = new Label();
         lblPitchAngleTitle = new Label();
         lblPitchAngle = new Label();
-        channelInputsLayout = new FlowLayoutPanel();
+        channelInputsLayout = new TableLayoutPanel();
         lblTargetDeg = new Label();
+        nudTargetDeg = new NumericUpDown();
+        lblThrottleUs = new Label();
+        nudThrottleUs = new NumericUpDown();
         lblSettleSec = new Label();
         nudSettleSec = new NumericUpDown();
         lblBaselineSec = new Label();
         nudBaselineSec = new NumericUpDown();
-        lblThrottleUs = new Label();
-        nudThrottleUs = new NumericUpDown();
-        nudTargetDeg = new NumericUpDown();
         grpPidWorkflow = new GroupBox();
         btnTuneRoll = new Button();
         lblActiveAxis = new Label();
@@ -98,21 +98,7 @@ partial class MainForm
         colAxis = new ColumnHeader();
         colScore = new ColumnHeader();
         colDecision = new ColumnHeader();
-        grpTelemetry = new GroupBox();
-        telemetryButtonLayout = new Panel();
-        btnTelemetryStart = new Button();
-        btnTelemetryStop = new Button();
-        btnTelemetrySnapshot = new Button();
-        telemetryValueLayout = new Panel();
-        lblTelemetryRollTitle = new Label();
-        lblTelemetryRoll = new Label();
-        lblTelemetryPitchTitle = new Label();
-        lblTelemetryPitch = new Label();
-        lblTelemetryYawTitle = new Label();
-        lblTelemetryYaw = new Label();
         pnlScoreChart = new Panel();
-        txtPidValues = new TextBox();
-        txtPidRecommendation = new TextBox();
         rootLayout.SuspendLayout();
         grpUsb.SuspendLayout();
         grpMapping.SuspendLayout();
@@ -122,15 +108,11 @@ partial class MainForm
         pnlRightStick.SuspendLayout();
         channelVisualLayout.SuspendLayout();
         channelInputsLayout.SuspendLayout();
+        ((System.ComponentModel.ISupportInitialize)nudTargetDeg).BeginInit();
+        ((System.ComponentModel.ISupportInitialize)nudThrottleUs).BeginInit();
         ((System.ComponentModel.ISupportInitialize)nudSettleSec).BeginInit();
         ((System.ComponentModel.ISupportInitialize)nudBaselineSec).BeginInit();
-        ((System.ComponentModel.ISupportInitialize)nudThrottleUs).BeginInit();
-        ((System.ComponentModel.ISupportInitialize)nudTargetDeg).BeginInit();
         grpPidWorkflow.SuspendLayout();
-        grpTelemetry.SuspendLayout();
-        telemetryButtonLayout.SuspendLayout();
-        telemetryValueLayout.SuspendLayout();
-        pnlScoreChart.SuspendLayout();
         SuspendLayout();
         // 
         // rootLayout
@@ -144,7 +126,6 @@ partial class MainForm
         rootLayout.Controls.Add(grpChannelTest, 2, 0);
         rootLayout.Controls.Add(grpPidWorkflow, 0, 1);
         rootLayout.Controls.Add(lvTuningRuns, 1, 1);
-        rootLayout.Controls.Add(grpTelemetry, 2, 1);
         rootLayout.Controls.Add(pnlScoreChart, 0, 2);
         rootLayout.Dock = DockStyle.Fill;
         rootLayout.Location = new Point(0, 0);
@@ -534,7 +515,7 @@ partial class MainForm
         pnlSticks.Controls.Add(pnlRightStick);
         pnlSticks.Location = new Point(99, 30);
         pnlSticks.Name = "pnlSticks";
-        pnlSticks.Size = new Size(322, 103);
+        pnlSticks.Size = new Size(350, 103);
         pnlSticks.TabIndex = 2;
         // 
         // pnlLeftStick
@@ -561,14 +542,14 @@ partial class MainForm
         pnlRightStick.Controls.Add(pnlRightStickIndicator);
         pnlRightStick.Location = new Point(170, 0);
         pnlRightStick.Name = "pnlRightStick";
-        pnlRightStick.Size = new Size(154, 103);
+        pnlRightStick.Size = new Size(162, 103);
         pnlRightStick.TabIndex = 1;
         // 
         // pnlRightStickIndicator
         // 
         pnlRightStickIndicator.Anchor = AnchorStyles.None;
         pnlRightStickIndicator.BackColor = Color.Blue;
-        pnlRightStickIndicator.Location = new Point(72, 50);
+        pnlRightStickIndicator.Location = new Point(76, 50);
         pnlRightStickIndicator.Name = "pnlRightStickIndicator";
         pnlRightStickIndicator.Size = new Size(10, 10);
         pnlRightStickIndicator.TabIndex = 0;
@@ -662,45 +643,97 @@ partial class MainForm
         // 
         // channelInputsLayout
         // 
-        channelInputsLayout.Controls.Add(lblTargetDeg);
-        channelInputsLayout.Controls.Add(nudTargetDeg);
-        channelInputsLayout.Controls.Add(lblThrottleUs);
-        channelInputsLayout.Controls.Add(nudThrottleUs);
-        channelInputsLayout.Controls.Add(lblSettleSec);
-        channelInputsLayout.Controls.Add(nudSettleSec);
-        channelInputsLayout.Controls.Add(lblBaselineSec);
-        channelInputsLayout.Controls.Add(nudBaselineSec);
+        channelInputsLayout.ColumnCount = 8;
+        channelInputsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60F));
+        channelInputsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 63F));
+        channelInputsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74F));
+        channelInputsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56F));
+        channelInputsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 81F));
+        channelInputsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 68F));
+        channelInputsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125F));
+        channelInputsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 50F));
+        channelInputsLayout.Controls.Add(lblTargetDeg, 0, 0);
+        channelInputsLayout.Controls.Add(nudTargetDeg, 1, 0);
+        channelInputsLayout.Controls.Add(lblThrottleUs, 2, 0);
+        channelInputsLayout.Controls.Add(nudThrottleUs, 3, 0);
+        channelInputsLayout.Controls.Add(lblSettleSec, 4, 0);
+        channelInputsLayout.Controls.Add(nudSettleSec, 5, 0);
+        channelInputsLayout.Controls.Add(lblBaselineSec, 6, 0);
+        channelInputsLayout.Controls.Add(nudBaselineSec, 7, 0);
         channelInputsLayout.Location = new Point(1, 140);
         channelInputsLayout.Name = "channelInputsLayout";
+        channelInputsLayout.RowCount = 1;
+        channelInputsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         channelInputsLayout.Size = new Size(649, 48);
         channelInputsLayout.TabIndex = 3;
         // 
         // lblTargetDeg
         // 
-        lblTargetDeg.Anchor = AnchorStyles.None;
-        lblTargetDeg.Location = new Point(3, 0);
+        lblTargetDeg.Anchor = AnchorStyles.Right;
+        lblTargetDeg.Location = new Point(0, 12);
+        lblTargetDeg.Margin = new Padding(0);
         lblTargetDeg.Name = "lblTargetDeg";
-        lblTargetDeg.Size = new Size(60, 35);
+        lblTargetDeg.Size = new Size(60, 23);
         lblTargetDeg.TabIndex = 0;
         lblTargetDeg.Text = "Target Δ°";
         lblTargetDeg.TextAlign = ContentAlignment.MiddleRight;
         // 
+        // nudTargetDeg
+        // 
+        nudTargetDeg.Anchor = AnchorStyles.Left;
+        nudTargetDeg.DecimalPlaces = 1;
+        nudTargetDeg.Location = new Point(60, 12);
+        nudTargetDeg.Margin = new Padding(0);
+        nudTargetDeg.Maximum = new decimal(new int[] { 45, 0, 0, 0 });
+        nudTargetDeg.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+        nudTargetDeg.Name = "nudTargetDeg";
+        nudTargetDeg.Size = new Size(57, 23);
+        nudTargetDeg.TabIndex = 1;
+        nudTargetDeg.TextAlign = HorizontalAlignment.Center;
+        nudTargetDeg.Value = new decimal(new int[] { 20, 0, 0, 0 });
+        // 
+        // lblThrottleUs
+        // 
+        lblThrottleUs.Anchor = AnchorStyles.Right;
+        lblThrottleUs.Location = new Point(123, 12);
+        lblThrottleUs.Margin = new Padding(0);
+        lblThrottleUs.Name = "lblThrottleUs";
+        lblThrottleUs.Size = new Size(74, 23);
+        lblThrottleUs.TabIndex = 6;
+        lblThrottleUs.Text = "Throttle";
+        lblThrottleUs.TextAlign = ContentAlignment.MiddleRight;
+        // 
+        // nudThrottleUs
+        // 
+        nudThrottleUs.Anchor = AnchorStyles.Left;
+        nudThrottleUs.Increment = new decimal(new int[] { 10, 0, 0, 0 });
+        nudThrottleUs.Location = new Point(197, 12);
+        nudThrottleUs.Margin = new Padding(0);
+        nudThrottleUs.Maximum = new decimal(new int[] { 1300, 0, 0, 0 });
+        nudThrottleUs.Minimum = new decimal(new int[] { 1150, 0, 0, 0 });
+        nudThrottleUs.Name = "nudThrottleUs";
+        nudThrottleUs.Size = new Size(50, 23);
+        nudThrottleUs.TabIndex = 7;
+        nudThrottleUs.Value = new decimal(new int[] { 1150, 0, 0, 0 });
+        // 
         // lblSettleSec
         // 
-        lblSettleSec.Anchor = AnchorStyles.Top | AnchorStyles.Bottom;
-        lblSettleSec.Location = new Point(268, 0);
+        lblSettleSec.Anchor = AnchorStyles.Right;
+        lblSettleSec.Location = new Point(253, 12);
+        lblSettleSec.Margin = new Padding(0);
         lblSettleSec.Name = "lblSettleSec";
-        lblSettleSec.Size = new Size(81, 35);
+        lblSettleSec.Size = new Size(81, 23);
         lblSettleSec.TabIndex = 2;
         lblSettleSec.Text = "Pre-wait (sec)";
         lblSettleSec.TextAlign = ContentAlignment.MiddleRight;
         // 
         // nudSettleSec
         // 
-        nudSettleSec.Anchor = AnchorStyles.None;
+        nudSettleSec.Anchor = AnchorStyles.Left;
         nudSettleSec.DecimalPlaces = 1;
         nudSettleSec.Increment = new decimal(new int[] { 1, 0, 0, 65536 });
-        nudSettleSec.Location = new Point(355, 6);
+        nudSettleSec.Location = new Point(334, 12);
+        nudSettleSec.Margin = new Padding(0);
         nudSettleSec.Maximum = new decimal(new int[] { 10, 0, 0, 0 });
         nudSettleSec.Name = "nudSettleSec";
         nudSettleSec.Size = new Size(68, 23);
@@ -710,58 +743,27 @@ partial class MainForm
         // 
         // lblBaselineSec
         // 
-        lblBaselineSec.Anchor = AnchorStyles.Top | AnchorStyles.Bottom;
-        lblBaselineSec.Location = new Point(429, 0);
+        lblBaselineSec.Anchor = AnchorStyles.Right;
+        lblBaselineSec.Location = new Point(402, 12);
+        lblBaselineSec.Margin = new Padding(0);
         lblBaselineSec.Name = "lblBaselineSec";
-        lblBaselineSec.Size = new Size(125, 35);
+        lblBaselineSec.Size = new Size(125, 23);
         lblBaselineSec.TabIndex = 4;
         lblBaselineSec.Text = "Seconds on Target Δ°";
         lblBaselineSec.TextAlign = ContentAlignment.MiddleRight;
         // 
         // nudBaselineSec
         // 
+        nudBaselineSec.Anchor = AnchorStyles.Left;
         nudBaselineSec.DecimalPlaces = 1;
         nudBaselineSec.Increment = new decimal(new int[] { 1, 0, 0, 65536 });
-        nudBaselineSec.Location = new Point(560, 3);
+        nudBaselineSec.Location = new Point(527, 12);
+        nudBaselineSec.Margin = new Padding(0);
         nudBaselineSec.Maximum = new decimal(new int[] { 10, 0, 0, 0 });
         nudBaselineSec.Name = "nudBaselineSec";
         nudBaselineSec.Size = new Size(50, 23);
         nudBaselineSec.TabIndex = 5;
         nudBaselineSec.Value = new decimal(new int[] { 1, 0, 0, 0 });
-        // 
-        // lblThrottleUs
-        // 
-        lblThrottleUs.Anchor = AnchorStyles.Top | AnchorStyles.Bottom;
-        lblThrottleUs.Location = new Point(132, 0);
-        lblThrottleUs.Name = "lblThrottleUs";
-        lblThrottleUs.Size = new Size(74, 35);
-        lblThrottleUs.TabIndex = 6;
-        lblThrottleUs.Text = "Throttle";
-        lblThrottleUs.TextAlign = ContentAlignment.MiddleRight;
-        // 
-        // nudThrottleUs
-        // 
-        nudThrottleUs.Increment = new decimal(new int[] { 10, 0, 0, 0 });
-        nudThrottleUs.Location = new Point(212, 3);
-        nudThrottleUs.Maximum = new decimal(new int[] { 1300, 0, 0, 0 });
-        nudThrottleUs.Minimum = new decimal(new int[] { 1150, 0, 0, 0 });
-        nudThrottleUs.Name = "nudThrottleUs";
-        nudThrottleUs.Size = new Size(50, 23);
-        nudThrottleUs.TabIndex = 7;
-        nudThrottleUs.Value = new decimal(new int[] { 1150, 0, 0, 0 });
-        // 
-        // nudTargetDeg
-        // 
-        nudTargetDeg.Anchor = AnchorStyles.None;
-        nudTargetDeg.DecimalPlaces = 1;
-        nudTargetDeg.Location = new Point(69, 3);
-        nudTargetDeg.Maximum = new decimal(new int[] { 45, 0, 0, 0 });
-        nudTargetDeg.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-        nudTargetDeg.Name = "nudTargetDeg";
-        nudTargetDeg.Size = new Size(57, 23);
-        nudTargetDeg.TabIndex = 1;
-        nudTargetDeg.TextAlign = HorizontalAlignment.Center;
-        nudTargetDeg.Value = new decimal(new int[] { 20, 0, 0, 0 });
         // 
         // grpPidWorkflow
         // 
@@ -967,162 +969,17 @@ partial class MainForm
         colDecision.Text = "Recommendation";
         colDecision.Width = 430;
         // 
-        // grpTelemetry
-        // 
-        grpTelemetry.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        grpTelemetry.Controls.Add(telemetryButtonLayout);
-        grpTelemetry.Controls.Add(telemetryValueLayout);
-        grpTelemetry.Location = new Point(772, 220);
-        grpTelemetry.Name = "grpTelemetry";
-        grpTelemetry.Padding = new Padding(10);
-        grpTelemetry.Size = new Size(694, 130);
-        grpTelemetry.TabIndex = 1;
-        grpTelemetry.TabStop = false;
-        grpTelemetry.Text = "Telemetry";
-        // 
-        // telemetryButtonLayout
-        // 
-        telemetryButtonLayout.Controls.Add(btnTelemetryStart);
-        telemetryButtonLayout.Controls.Add(btnTelemetryStop);
-        telemetryButtonLayout.Controls.Add(btnTelemetrySnapshot);
-        telemetryButtonLayout.Location = new Point(13, 29);
-        telemetryButtonLayout.Name = "telemetryButtonLayout";
-        telemetryButtonLayout.Size = new Size(548, 32);
-        telemetryButtonLayout.TabIndex = 0;
-        // 
-        // btnTelemetryStart
-        // 
-        btnTelemetryStart.Location = new Point(3, 3);
-        btnTelemetryStart.Name = "btnTelemetryStart";
-        btnTelemetryStart.Size = new Size(98, 29);
-        btnTelemetryStart.TabIndex = 0;
-        btnTelemetryStart.Text = "Start Live";
-        btnTelemetryStart.UseVisualStyleBackColor = true;
-        btnTelemetryStart.Click += btnTelemetryStart_Click;
-        // 
-        // btnTelemetryStop
-        // 
-        btnTelemetryStop.Enabled = false;
-        btnTelemetryStop.Location = new Point(107, 3);
-        btnTelemetryStop.Name = "btnTelemetryStop";
-        btnTelemetryStop.Size = new Size(98, 29);
-        btnTelemetryStop.TabIndex = 1;
-        btnTelemetryStop.Text = "Stop Live";
-        btnTelemetryStop.UseVisualStyleBackColor = true;
-        btnTelemetryStop.Click += btnTelemetryStop_Click;
-        // 
-        // btnTelemetrySnapshot
-        // 
-        btnTelemetrySnapshot.Location = new Point(211, 3);
-        btnTelemetrySnapshot.Name = "btnTelemetrySnapshot";
-        btnTelemetrySnapshot.Size = new Size(98, 29);
-        btnTelemetrySnapshot.TabIndex = 2;
-        btnTelemetrySnapshot.Text = "Snapshot";
-        btnTelemetrySnapshot.UseVisualStyleBackColor = true;
-        btnTelemetrySnapshot.Click += btnTelemetrySnapshot_Click;
-        // 
-        // telemetryValueLayout
-        // 
-        telemetryValueLayout.Controls.Add(lblTelemetryRollTitle);
-        telemetryValueLayout.Controls.Add(lblTelemetryRoll);
-        telemetryValueLayout.Controls.Add(lblTelemetryPitchTitle);
-        telemetryValueLayout.Controls.Add(lblTelemetryPitch);
-        telemetryValueLayout.Controls.Add(lblTelemetryYawTitle);
-        telemetryValueLayout.Controls.Add(lblTelemetryYaw);
-        telemetryValueLayout.Location = new Point(13, 67);
-        telemetryValueLayout.Name = "telemetryValueLayout";
-        telemetryValueLayout.Size = new Size(548, 25);
-        telemetryValueLayout.TabIndex = 1;
-        // 
-        // lblTelemetryRollTitle
-        // 
-        lblTelemetryRollTitle.Anchor = AnchorStyles.Left;
-        lblTelemetryRollTitle.Location = new Point(3, 5);
-        lblTelemetryRollTitle.Name = "lblTelemetryRollTitle";
-        lblTelemetryRollTitle.Size = new Size(30, 15);
-        lblTelemetryRollTitle.TabIndex = 0;
-        lblTelemetryRollTitle.Text = "Roll:";
-        // 
-        // lblTelemetryRoll
-        // 
-        lblTelemetryRoll.Anchor = AnchorStyles.Left;
-        lblTelemetryRoll.Location = new Point(38, 5);
-        lblTelemetryRoll.Name = "lblTelemetryRoll";
-        lblTelemetryRoll.Size = new Size(48, 15);
-        lblTelemetryRoll.TabIndex = 1;
-        lblTelemetryRoll.Text = "--.- deg";
-        // 
-        // lblTelemetryPitchTitle
-        // 
-        lblTelemetryPitchTitle.Anchor = AnchorStyles.Left;
-        lblTelemetryPitchTitle.Location = new Point(128, 5);
-        lblTelemetryPitchTitle.Name = "lblTelemetryPitchTitle";
-        lblTelemetryPitchTitle.Size = new Size(37, 15);
-        lblTelemetryPitchTitle.TabIndex = 2;
-        lblTelemetryPitchTitle.Text = "Pitch:";
-        // 
-        // lblTelemetryPitch
-        // 
-        lblTelemetryPitch.Anchor = AnchorStyles.Left;
-        lblTelemetryPitch.Location = new Point(166, 5);
-        lblTelemetryPitch.Name = "lblTelemetryPitch";
-        lblTelemetryPitch.Size = new Size(48, 15);
-        lblTelemetryPitch.TabIndex = 3;
-        lblTelemetryPitch.Text = "--.- deg";
-        // 
-        // lblTelemetryYawTitle
-        // 
-        lblTelemetryYawTitle.Anchor = AnchorStyles.Left;
-        lblTelemetryYawTitle.Location = new Point(256, 5);
-        lblTelemetryYawTitle.Name = "lblTelemetryYawTitle";
-        lblTelemetryYawTitle.Size = new Size(31, 15);
-        lblTelemetryYawTitle.TabIndex = 4;
-        lblTelemetryYawTitle.Text = "Yaw:";
-        // 
-        // lblTelemetryYaw
-        // 
-        lblTelemetryYaw.Anchor = AnchorStyles.Left;
-        lblTelemetryYaw.Location = new Point(291, 5);
-        lblTelemetryYaw.Name = "lblTelemetryYaw";
-        lblTelemetryYaw.Size = new Size(48, 15);
-        lblTelemetryYaw.TabIndex = 5;
-        lblTelemetryYaw.Text = "--.- deg";
-        // 
         // pnlScoreChart
         // 
         pnlScoreChart.BackColor = Color.White;
         pnlScoreChart.BorderStyle = BorderStyle.FixedSingle;
         rootLayout.SetColumnSpan(pnlScoreChart, 3);
-        pnlScoreChart.Controls.Add(txtPidValues);
-        pnlScoreChart.Controls.Add(txtPidRecommendation);
         pnlScoreChart.Dock = DockStyle.Fill;
         pnlScoreChart.Location = new Point(13, 365);
         pnlScoreChart.Name = "pnlScoreChart";
         pnlScoreChart.Size = new Size(1453, 570);
         pnlScoreChart.TabIndex = 0;
         pnlScoreChart.Paint += pnlScoreChart_Paint;
-        // 
-        // txtPidValues
-        // 
-        txtPidValues.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right;
-        txtPidValues.Location = new Point(993, 33);
-        txtPidValues.Multiline = true;
-        txtPidValues.Name = "txtPidValues";
-        txtPidValues.ReadOnly = true;
-        txtPidValues.Size = new Size(297, 509);
-        txtPidValues.TabIndex = 5;
-        txtPidValues.Text = "Roll P/I/D: --/--/--\r\nPitch P/I/D: --/--/--";
-        // 
-        // txtPidRecommendation
-        // 
-        txtPidRecommendation.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        txtPidRecommendation.Location = new Point(640, 360);
-        txtPidRecommendation.Multiline = true;
-        txtPidRecommendation.Name = "txtPidRecommendation";
-        txtPidRecommendation.ReadOnly = true;
-        txtPidRecommendation.Size = new Size(297, 124);
-        txtPidRecommendation.TabIndex = 3;
-        txtPidRecommendation.Text = "Tune Roll or Pitch to generate a recommendation.";
         // 
         // MainForm
         // 
@@ -1144,16 +1001,11 @@ partial class MainForm
         pnlRightStick.ResumeLayout(false);
         channelVisualLayout.ResumeLayout(false);
         channelInputsLayout.ResumeLayout(false);
+        ((System.ComponentModel.ISupportInitialize)nudTargetDeg).EndInit();
+        ((System.ComponentModel.ISupportInitialize)nudThrottleUs).EndInit();
         ((System.ComponentModel.ISupportInitialize)nudSettleSec).EndInit();
         ((System.ComponentModel.ISupportInitialize)nudBaselineSec).EndInit();
-        ((System.ComponentModel.ISupportInitialize)nudThrottleUs).EndInit();
-        ((System.ComponentModel.ISupportInitialize)nudTargetDeg).EndInit();
         grpPidWorkflow.ResumeLayout(false);
-        grpTelemetry.ResumeLayout(false);
-        telemetryButtonLayout.ResumeLayout(false);
-        telemetryValueLayout.ResumeLayout(false);
-        pnlScoreChart.ResumeLayout(false);
-        pnlScoreChart.PerformLayout();
         ResumeLayout(false);
     }
 
@@ -1187,7 +1039,6 @@ partial class MainForm
     private Button btnPresetRtae;
     private Button btnPresetReat;
     private GroupBox grpChannelTest;
-    private GroupBox grpTelemetry;
     private GroupBox grpPidWorkflow;
     private Button btnTuneRoll;
     private Button btnTunePitch;
@@ -1204,25 +1055,12 @@ partial class MainForm
     private Label lblActiveAxisTitle;
     private Label lblActiveAxis;
     private Label lblPidValuesTitle;
-    private TextBox txtPidValues;
-    private TextBox txtPidRecommendation;
     private Panel pnlScoreChart;
     private ListView lvTuningRuns;
     private ColumnHeader colRun;
     private ColumnHeader colAxis;
     private ColumnHeader colScore;
     private ColumnHeader colDecision;
-    private Panel telemetryButtonLayout;
-    private Button btnTelemetryStart;
-    private Button btnTelemetryStop;
-    private Button btnTelemetrySnapshot;
-    private Panel telemetryValueLayout;
-    private Label lblTelemetryRollTitle;
-    private Label lblTelemetryRoll;
-    private Label lblTelemetryPitchTitle;
-    private Label lblTelemetryPitch;
-    private Label lblTelemetryYawTitle;
-    private Label lblTelemetryYaw;
     private Panel channelVisualLayout;
     private Label lblChannelVisualTitle;
     private Label lblChannelVisual;
@@ -1242,7 +1080,7 @@ partial class MainForm
     private Panel pnlLeftStickIndicator;
     private Panel pnlRightStick;
     private Panel pnlRightStickIndicator;
-    private FlowLayoutPanel channelInputsLayout;
+    private TableLayoutPanel channelInputsLayout;
     private Label lblTargetDeg;
     private Label lblSettleSec;
     private NumericUpDown nudSettleSec;
