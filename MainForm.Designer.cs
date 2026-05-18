@@ -273,6 +273,7 @@ partial class MainForm
         cboBaud.Items.AddRange(new object[] { "9600", "115200" });
         cboBaud.Location = new Point(138, 3);
         cboBaud.Name = "cboBaud";
+        cboBaud.SelectedIndex = 1;
         cboBaud.Size = new Size(110, 23);
         cboBaud.TabIndex = 2;
         // 
@@ -294,6 +295,7 @@ partial class MainForm
         cboArduinoBaud.Items.AddRange(new object[] { "9600", "115200" });
         cboArduinoBaud.Location = new Point(138, 36);
         cboArduinoBaud.Name = "cboArduinoBaud";
+        cboArduinoBaud.SelectedIndex = 1;
         cboArduinoBaud.Size = new Size(110, 23);
         cboArduinoBaud.TabIndex = 9;
         // 
