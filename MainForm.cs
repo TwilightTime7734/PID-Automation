@@ -31,6 +31,7 @@ public sealed partial class MainForm : Form
     private bool _arduinoConnected;
     private bool _startupScanInProgress;
     private bool _fcConnectInProgress;
+    private bool _arduinoConnectInProgress;
     private string? _fcTransientStatus;
     private string? _arduinoTransientStatus;
     private bool _pidSnapshotRefreshInProgress;
@@ -89,6 +90,14 @@ public sealed partial class MainForm : Form
         }
 
         // Startup auto-scan disabled for manual connection workflow.
+        if (cboBaud.Items.Contains("115200"))
+        {
+            cboBaud.SelectedItem = "115200";
+        }
+        if (cboArduinoBaud.Items.Contains("115200"))
+        {
+            cboArduinoBaud.SelectedItem = "115200";
+        }
         cboPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
         cboArduinoPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
         cboBaud.SelectedIndexChanged += (_, _) => OnFcBaudChanged();
@@ -503,7 +512,7 @@ public sealed partial class MainForm : Form
     {
         _fcTransientStatus = "Scanning FC ports...";
         _arduinoTransientStatus = "Scanning Arduino ports...";
-        UpdateSerialConnectionUi();
+        RefreshConnectionStatusLabels();
 
         var ports = _serialPortService.GetAvailablePorts();
         var preferredFcPort = GetPreferredFcPort(ports);
@@ -692,6 +701,9 @@ public sealed partial class MainForm : Form
             return;
         }
         var baudRate = _arduinoBaudRate;
+        _arduinoConnectInProgress = true;
+        SetArduinoStatus($"Connecting Arduino: {portName}@{baudRate}...");
+        UpdateSerialConnectionUi();
 
         try
         {
@@ -708,6 +720,11 @@ public sealed partial class MainForm : Form
             _arduinoConnected = false;
             SetArduinoStatus("Arduino not connected.");
             MessageBox.Show(this, ex.Message, "Arduino connection failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            UpdateSerialConnectionUi();
+        }
+        finally
+        {
+            _arduinoConnectInProgress = false;
             UpdateSerialConnectionUi();
         }
     }
@@ -751,7 +768,7 @@ public sealed partial class MainForm : Form
         var simulationEnabled = _simulationMode;
         var arduinoPortSelected = cboArduinoPort.SelectedItem is string arduinoPort && !string.IsNullOrWhiteSpace(arduinoPort);
         var arduinoConnectedNow = _arduinoConnected || _arduinoTrainerClient.IsConnected;
-        btnArduinoConnect.Enabled = (simulationEnabled || arduinoPortSelected || cboArduinoPort.Items.Count > 0) && !arduinoConnectedNow;
+        btnArduinoConnect.Enabled = (simulationEnabled || arduinoPortSelected || cboArduinoPort.Items.Count > 0) && !arduinoConnectedNow && !_arduinoConnectInProgress;
         btnArduinoDisconnect.Enabled = arduinoConnectedNow;
         cboArduinoPort.Enabled = !simulationEnabled;
         cboArduinoBaud.Enabled = !simulationEnabled;
