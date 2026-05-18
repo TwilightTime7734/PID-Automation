@@ -1979,6 +1979,16 @@ public sealed partial class MainForm : Form
 
     }
 
+    private void TblUsb_Paint(object sender, PaintEventArgs e)
+    {
+
+    }
+
+    private void LblSettleSec_Click(object sender, EventArgs e)
+    {
+
+    }
+
     private sealed record TuningRunRecord(
         int RunNumber,
         string Axis,
