@@ -38,3 +38,5 @@
 
 ## Notes
 - `Services/ArduinoTrainerCableClient.cs` is currently untracked and not included in those commits.
+- User confirmation (May 18, 2026): rebuilt design is working great.
+- User confirmation (May 18, 2026): USB FC connection and FC read functions are working fine.

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.IO.Ports;
+using System.Threading.Tasks;
 using DronePidTuningAssistant.WinForms.Models;
 
 namespace DronePidTuningAssistant.WinForms.Services;
@@ -86,10 +87,26 @@ public sealed class SerialPortService : IDisposable
             _writerThread.Start();
         }
 
+        // Allow reader/writer threads time to enter their loops before probing
+        Thread.Sleep(200);
+
         try
         {
             ProbeInav();
             StartAttitudePolling();
+
+            // Kick off settings discovery in background to avoid blocking connect.
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    DiscoverSettings(2.0);
+                }
+                catch
+                {
+                    // Ignore discovery failures; on-demand lookup will still work.
+                }
+            });
         }
         catch
         {
@@ -228,7 +245,7 @@ public sealed class SerialPortService : IDisposable
 
     private void ProbeInav()
     {
-        var variant = Request(MspFcVariant, 1.2);
+        var variant = Request(MspFcVariant, 3.0);
         if (variant.Length < 4)
         {
             throw new InvalidOperationException("MSP did not return FC variant.");
@@ -240,8 +257,8 @@ public sealed class SerialPortService : IDisposable
             throw new InvalidOperationException($"MSP variant '{variantText}' is not INAV.");
         }
 
-        _ = Request(MspApiVersion, 1.0);
-        _ = Request(MspFcVersion, 1.0);
+        _ = Request(MspApiVersion, 2.0);
+        _ = Request(MspFcVersion, 2.0);
     }
 
     private void StartAttitudePolling()
@@ -492,26 +509,130 @@ public sealed class SerialPortService : IDisposable
         {
             throw new KeyNotFoundException($"INAV setting '{settingName}' was not found via MSP2_COMMON_SETTING_INFO.");
         }
+        // First try querying by name (null-terminated string) like INAV configurator does.
+        try
+        {
+            var nameBytes = System.Text.Encoding.ASCII.GetBytes(settingName + "\0");
+            var resp = RequestWithPayload(Msp2CommonSettingInfo, nameBytes, timeoutSeconds);
+            if (resp != null && resp.Length >= 8)
+            {
+                // Response format (per INAV MSPHelper):
+                // <name>\0, PG_ID (u16), type (u8), section (u8), mode (u8), min (s32), max (u32), index (u16), ...
+                var zero = Array.IndexOf(resp, (byte)0);
+                if (zero >= 0)
+                {
+                    var offset = zero + 1;
+                    if (offset + 2 + 1 + 1 + 1 + 4 + 4 + 2 <= resp.Length)
+                    {
+                        offset += 2; // PG_ID
+                        offset += 1; // type
+                        offset += 1; // section
+                        offset += 1; // mode
+                        offset += 4; // min
+                        offset += 4; // max
+                        var index = BitConverter.ToUInt16(resp, offset);
+                        _settingIndexCache[key] = index;
+                        return index;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Ignore and fall back to index scan
+        }
+
+        // Fallback: scan indices (kept as a secondary measure)
+        var queryTimeout = Math.Min(0.2, timeoutSeconds);
+        var emptyCount = 0;
 
         for (var index = 0; index < 4096; index++)
         {
-            var payload = RequestWithPayload(Msp2CommonSettingInfo, SettingKeyPayload(index), timeoutSeconds);
-            var zero = Array.IndexOf(payload, (byte)0);
-            if (zero < 0)
+            try
             {
-                continue;
-            }
+                var payload = RequestWithPayload(Msp2CommonSettingInfo, SettingKeyPayload(index), queryTimeout);
+                var zero = Array.IndexOf(payload, (byte)0);
+                if (zero < 0 || payload.Length < 2)
+                {
+                    emptyCount++;
+                    if (emptyCount >= 10)
+                    {
+                        break;
+                    }
+                    continue;
+                }
 
-            var found = System.Text.Encoding.ASCII.GetString(payload, 0, zero).Trim().ToLowerInvariant();
-            if (found == key)
+                emptyCount = 0; // Reset on successful response
+                var found = System.Text.Encoding.ASCII.GetString(payload, 0, zero).Trim().ToLowerInvariant();
+                if (found == key)
+                {
+                    _settingIndexCache[key] = index;
+                    return index;
+                }
+            }
+            catch (TimeoutException)
             {
-                _settingIndexCache[key] = index;
-                return index;
+                emptyCount++;
+                if (emptyCount >= 10)
+                {
+                    break;
+                }
+                continue;
             }
         }
 
         _missingSettingCache.Add(key);
         throw new KeyNotFoundException($"INAV setting '{settingName}' was not found via MSP2_COMMON_SETTING_INFO.");
+    }
+
+    private void DiscoverSettings(double timeoutSeconds)
+    {
+        var perQueryTimeout = Math.Min(0.25, timeoutSeconds / 20.0);
+        var emptyCount = 0;
+        const int maxConsecutiveEmpty = 5;
+
+        for (var index = 0; index < 4096; index++)
+        {
+            try
+            {
+                var payload = RequestWithPayload(Msp2CommonSettingInfo, SettingKeyPayload(index), perQueryTimeout);
+                var zero = Array.IndexOf(payload, (byte)0);
+                if (zero < 0 || payload.Length < 2)
+                {
+                    emptyCount++;
+                    if (emptyCount >= maxConsecutiveEmpty)
+                    {
+                        break;
+                    }
+                    continue;
+                }
+
+                emptyCount = 0;
+                var name = System.Text.Encoding.ASCII.GetString(payload, 0, zero).Trim().ToLowerInvariant();
+                if (!string.IsNullOrEmpty(name) && !_settingIndexCache.ContainsKey(name))
+                {
+                    _settingIndexCache[name] = index;
+                }
+            }
+            catch (TimeoutException)
+            {
+                emptyCount++;
+                if (emptyCount >= maxConsecutiveEmpty)
+                {
+                    break;
+                }
+                continue;
+            }
+            catch
+            {
+                // Ignore other non-fatal errors during discovery
+                emptyCount++;
+                if (emptyCount >= maxConsecutiveEmpty)
+                {
+                    break;
+                }
+            }
+        }
     }
 
     private static byte[] SettingKeyPayload(int index)
