@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Drawing.Drawing2D;
 using System.IO.Ports;
 using System.Management;
+using System.Diagnostics;
 using DronePidTuningAssistant.WinForms.Models;
 using DronePidTuningAssistant.WinForms.Services;
 
@@ -29,6 +30,9 @@ public sealed partial class MainForm : Form
     private bool _channelTestRunning;
     private bool _arduinoConnected;
     private bool _startupScanInProgress;
+    private bool _fcConnectInProgress;
+    private bool _pidSnapshotRefreshInProgress;
+    private bool _isClosing;
     private string? _activeAxis;
     private int _rollIteration;
     private int _pitchIteration;
@@ -43,10 +47,12 @@ public sealed partial class MainForm : Form
         ["mc_p_roll"] = 40,
         ["mc_i_roll"] = 50,
         ["mc_d_roll"] = 30,
+        ["mc_cd_roll"] = 40,
         ["mc_ff_roll"] = 40,
         ["mc_p_pitch"] = 40,
         ["mc_i_pitch"] = 50,
         ["mc_d_pitch"] = 30,
+        ["mc_cd_pitch"] = 40,
         ["mc_ff_pitch"] = 40,
         ["mc_p_yaw"] = 45,
         ["mc_i_yaw"] = 55,
@@ -80,7 +86,7 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        Shown += async (_, _) => await DiscoverPortsOnStartupAsync();
+        // Startup auto-scan disabled for manual connection workflow.
         cboPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
         cboArduinoPort.SelectedIndexChanged += (_, _) => UpdateSerialConnectionUi();
         cboBaud.SelectedIndexChanged += (_, _) => OnFcBaudChanged();
@@ -116,8 +122,23 @@ public sealed partial class MainForm : Form
             var result = await Task.Run(() =>
             {
                 var available = _serialPortService.GetAvailablePorts().ToList();
+                // Startup can race USB enumeration; take a second snapshot and merge.
+                Thread.Sleep(300);
+                var secondPass = _serialPortService.GetAvailablePorts();
+                foreach (var port in secondPass)
+                {
+                    if (!available.Contains(port, StringComparer.OrdinalIgnoreCase))
+                    {
+                        available.Add(port);
+                    }
+                }
+
+                available = available
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
                 var responsive = available.Where(IsPortResponsive).ToList();
-                var source = responsive.Count > 0 ? responsive : available;
+                var source = available;
                 var friendlyByPort = GetPortFriendlyNames();
 
                 string? fcConnectedPort = null;
@@ -530,8 +551,8 @@ public sealed partial class MainForm : Form
             {
                 ReadTimeout = 150,
                 WriteTimeout = 150,
-                DtrEnable = false,
-                RtsEnable = false,
+                DtrEnable = true,
+                RtsEnable = true,
             };
             probe.Open();
             return probe.IsOpen;
@@ -542,7 +563,7 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void ConnectUsb()
+    private async Task ConnectUsbAsync()
     {
         if (cboPort.SelectedItem is not string portName || string.IsNullOrWhiteSpace(portName))
         {
@@ -550,18 +571,45 @@ public sealed partial class MainForm : Form
             return;
         }
         var baudRate = _fcBaudRate;
+        _fcConnectInProgress = true;
+        var connectTimer = Stopwatch.StartNew();
+        SetFcStatus($"Connecting FC USB: {portName}@{baudRate}...");
+        UpdateSerialConnectionUi();
 
         try
         {
-            _serialPortService.Connect(portName, baudRate);
-            lblFCStatus.Text = $"Connected FC USB: {portName}@{baudRate}";
-            RefreshPidSnapshotFromFc();
+            await Task.Run(() => _serialPortService.Connect(portName, baudRate));
+            SetFcStatus($"FC USB opened: {portName}@{baudRate}. Verifying MSP...");
+            var telemetryVerified = true;
+            try
+            {
+                _ = await Task.Run(() => _serialPortService.ReadAttitude(0.8));
+            }
+            catch
+            {
+                telemetryVerified = false;
+            }
+
+            connectTimer.Stop();
+            SetFcStatus(telemetryVerified
+                ? $"Connected FC USB: {portName}@{baudRate} ({connectTimer.Elapsed.TotalSeconds:F1}s)"
+                : $"FC USB opened on {portName}@{baudRate}, but MSP telemetry did not respond yet.");
+            UpdatePidSnapshotPanel(
+                null, null, null, null,
+                null, null, null, null,
+                null, null, null, null);
             UpdateSerialConnectionUi();
         }
         catch (Exception ex)
         {
+            connectTimer.Stop();
             MessageBox.Show(this, ex.Message, "Connection failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            lblFCStatus.Text = "FC USB connection failed.";
+            SetFcStatus($"FC USB connection failed after {connectTimer.Elapsed.TotalSeconds:F1}s.");
+            UpdateSerialConnectionUi();
+        }
+        finally
+        {
+            _fcConnectInProgress = false;
             UpdateSerialConnectionUi();
         }
     }
@@ -648,13 +696,13 @@ public sealed partial class MainForm : Form
         var fcSelectedIsConnected = fcConnected
             && fcPortSelected
             && string.Equals(_serialPortService.ConnectedPortName, selectedFcPort, StringComparison.OrdinalIgnoreCase);
-        btnFcConnect.Enabled = !_startupScanInProgress && fcPortSelected && !fcSelectedIsConnected;
+        btnFcConnect.Enabled = !_fcConnectInProgress && !fcSelectedIsConnected;
         btnFcDisconnect.Enabled = fcSelectedIsConnected;
 
         var simulationEnabled = _simulationMode;
         var arduinoPortSelected = cboArduinoPort.SelectedItem is string arduinoPort && !string.IsNullOrWhiteSpace(arduinoPort);
         var arduinoConnectedNow = _arduinoConnected || _arduinoTrainerClient.IsConnected;
-        btnArduinoConnect.Enabled = !_startupScanInProgress && (simulationEnabled || arduinoPortSelected) && !arduinoConnectedNow;
+        btnArduinoConnect.Enabled = (simulationEnabled || arduinoPortSelected || cboArduinoPort.Items.Count > 0) && !arduinoConnectedNow;
         btnArduinoDisconnect.Enabled = arduinoConnectedNow;
         cboArduinoPort.Enabled = !simulationEnabled;
         cboArduinoBaud.Enabled = !simulationEnabled;
@@ -819,17 +867,18 @@ public sealed partial class MainForm : Form
     {
         var fcConnected = _serialPortService.IsConnected;
         var activePath = GetActiveControlPath();
-        var canRunChannelTests = _arduinoConnected || _simulationMode;
+        var canRunChannelTests = fcConnected || _simulationMode;
 
         if (!_channelTestRunning)
         {
             btnTestRoll.Enabled = canRunChannelTests;
             btnTestPitch.Enabled = canRunChannelTests;
             btnTestThrottle.Enabled = canRunChannelTests;
+            btnTestYaw.Enabled = canRunChannelTests;
             lblChannelVisual.Text = $"Path: {DescribeActivePath()}";
         }
 
-        var pidEnabled = (fcConnected || _simulationMode) && !_channelTestRunning;
+        var pidEnabled = (fcConnected || _simulationMode) && !_channelTestRunning && !_fcConnectInProgress;
         SetPidButtonsEnabled(pidEnabled);
     }
 
@@ -1008,6 +1057,7 @@ public sealed partial class MainForm : Form
         btnTestRoll.Enabled = enabled;
         btnTestPitch.Enabled = enabled;
         btnTestThrottle.Enabled = enabled;
+        btnTestYaw.Enabled = enabled;
     }
 
     private static string AxisCodeForControl(string control)
@@ -1190,8 +1240,7 @@ public sealed partial class MainForm : Form
         }
         finally
         {
-            SetPidButtonsEnabled(true);
-            SetChannelTestButtonsEnabled(true);
+            UpdateWorkflowUiState();
         }
     }
 
@@ -1409,6 +1458,7 @@ public sealed partial class MainForm : Form
     {
         btnTuneRoll.Enabled = enabled;
         btnTunePitch.Enabled = enabled;
+        btnTuneYaw.Enabled = enabled;
         btnRetestAxis.Enabled = enabled;
         btnFinishAxis.Enabled = enabled;
         btnApplyRecommendedPid.Enabled = enabled;
@@ -1418,6 +1468,7 @@ public sealed partial class MainForm : Form
         btnManualPidPlus2.Enabled = enabled;
         btnReadFcPid.Enabled = enabled;
         btnSaveFcPid.Enabled = enabled;
+        btnPidEditable.Enabled = enabled;
         cmbManualAxis.Enabled = enabled;
         cmbManualGain.Enabled = enabled;
         cmbManualPoints.Enabled = enabled;
@@ -1499,7 +1550,7 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void ReadFcPidValues()
+    private async Task ReadFcPidValuesAsync()
     {
         if (!_serialPortService.IsConnected && !_simulationMode)
         {
@@ -1507,16 +1558,15 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        try
+        if (_pidSnapshotRefreshInProgress)
         {
-            RefreshPidSnapshotFromFc();
-            lblFCStatus.Text = _simulationMode ? "Read PID values from simulator." : "Read PID values from FC.";
+            lblFCStatus.Text = "PID read already in progress...";
+            return;
         }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "Read FC failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            lblFCStatus.Text = "Read FC failed.";
-        }
+
+        await RefreshPidSnapshotFromFcAsync(
+            showErrors: true,
+            successStatus: _simulationMode ? "Read PID values from simulator." : "Read PID values from FC.");
     }
 
     private void SaveFcPidValues()
@@ -1566,23 +1616,8 @@ public sealed partial class MainForm : Form
                 null, null, null, null);
             return;
         }
-        var rp = TryGetPidSettingInt("mc_p_roll");
-        var ri = TryGetPidSettingInt("mc_i_roll");
-        var rd = TryGetPidSettingInt("mc_d_roll");
-        var rf = TryGetPidSettingInt("mc_ff_roll");
-        var pp = TryGetPidSettingInt("mc_p_pitch");
-        var pi = TryGetPidSettingInt("mc_i_pitch");
-        var pd = TryGetPidSettingInt("mc_d_pitch");
-        var pf = TryGetPidSettingInt("mc_ff_pitch");
-        var yp = TryGetPidSettingInt("mc_p_yaw");
-        var yi = TryGetPidSettingInt("mc_i_yaw");
-        var yd = TryGetPidSettingInt("mc_d_yaw");
-        var yf = TryGetPidSettingInt("mc_ff_yaw");
 
-        UpdatePidSnapshotPanel(
-            rp, ri, rd, rf,
-            pp, pi, pd, pf,
-            yp, yi, yd, yf);
+        _ = RefreshPidSnapshotFromFcAsync(showErrors: false);
     }
 
     private void UpdatePidSnapshotPanel(
@@ -1604,7 +1639,85 @@ public sealed partial class MainForm : Form
         txtYawFf.Text = yawFf?.ToString(CultureInfo.InvariantCulture) ?? "--";
     }
 
-    private int? TryGetPidSettingInt(string settingName)
+    private async Task RefreshPidSnapshotFromFcAsync(bool showErrors, string? successStatus = null)
+    {
+        if (_pidSnapshotRefreshInProgress)
+        {
+            return;
+        }
+
+        _pidSnapshotRefreshInProgress = true;
+        try
+        {
+            if (!_serialPortService.IsConnected && !_simulationMode)
+            {
+                UpdatePidSnapshotPanel(
+                    null, null, null, null,
+                    null, null, null, null,
+                    null, null, null, null);
+                return;
+            }
+
+            if (!_isClosing && !_simulationMode)
+            {
+                lblFCStatus.Text = "Reading PID values from FC...";
+            }
+
+            var snapshotTask = Task.Run(FetchPidSnapshotValues);
+            var snapshot = await snapshotTask.WaitAsync(TimeSpan.FromSeconds(8));
+            UpdatePidSnapshotPanel(
+                snapshot.RollP, snapshot.RollI, snapshot.RollD, snapshot.RollFf,
+                snapshot.PitchP, snapshot.PitchI, snapshot.PitchD, snapshot.PitchFf,
+                snapshot.YawP, snapshot.YawI, snapshot.YawD, snapshot.YawFf);
+
+            if (!string.IsNullOrWhiteSpace(successStatus))
+            {
+                lblFCStatus.Text = successStatus;
+            }
+        }
+        catch (TimeoutException)
+        {
+            if (showErrors)
+            {
+                MessageBox.Show(this, "Timed out reading PID values from FC.", "Read FC failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            if (!_isClosing)
+            {
+                lblFCStatus.Text = "Read FC timed out.";
+            }
+        }
+        catch (Exception ex)
+        {
+            if (showErrors)
+            {
+                MessageBox.Show(this, ex.Message, "Read FC failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                lblFCStatus.Text = "Read FC failed.";
+            }
+        }
+        finally
+        {
+            _pidSnapshotRefreshInProgress = false;
+        }
+    }
+
+    private PidSnapshotValues FetchPidSnapshotValues()
+    {
+        return new PidSnapshotValues(
+            TryGetPidSettingIntCore("mc_p_roll"),
+            TryGetPidSettingIntCore("mc_i_roll"),
+            TryGetPidSettingIntCore("mc_d_roll"),
+            TryGetPidSettingIntCore("mc_cd_roll"),
+            TryGetPidSettingIntCore("mc_p_pitch"),
+            TryGetPidSettingIntCore("mc_i_pitch"),
+            TryGetPidSettingIntCore("mc_d_pitch"),
+            TryGetPidSettingIntCore("mc_cd_pitch"),
+            null,
+            null,
+            null,
+            null);
+    }
+
+    private int? TryGetPidSettingIntCore(string settingName)
     {
         try
         {
@@ -1621,15 +1734,11 @@ public sealed partial class MainForm : Form
         WritePidGridCell("mc_p_roll", txtRollP.Text);
         WritePidGridCell("mc_i_roll", txtRollI.Text);
         WritePidGridCell("mc_d_roll", txtRollD.Text);
-        WritePidGridCell("mc_ff_roll", txtRollFf.Text);
+        WritePidGridCell("mc_cd_roll", txtRollFf.Text);
         WritePidGridCell("mc_p_pitch", txtPitchP.Text);
         WritePidGridCell("mc_i_pitch", txtPitchI.Text);
         WritePidGridCell("mc_d_pitch", txtPitchD.Text);
-        WritePidGridCell("mc_ff_pitch", txtPitchFf.Text);
-        WritePidGridCell("mc_p_yaw", txtYawP.Text);
-        WritePidGridCell("mc_i_yaw", txtYawI.Text);
-        WritePidGridCell("mc_d_yaw", txtYawD.Text);
-        WritePidGridCell("mc_ff_yaw", txtYawFf.Text);
+        WritePidGridCell("mc_cd_pitch", txtPitchFf.Text);
     }
 
     private void WritePidGridCell(string settingName, string valueText)
@@ -1811,6 +1920,7 @@ public sealed partial class MainForm : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        _isClosing = true;
         DisconnectArduinoUsb();
         _serialPortService.Dispose();
 
@@ -1824,7 +1934,7 @@ public sealed partial class MainForm : Form
     }
 
     private void btnRefreshPorts_Click(object sender, EventArgs e) => RefreshPortList();
-    private void btnConnect_Click(object sender, EventArgs e) => ConnectUsb();
+    private async void btnConnect_Click(object sender, EventArgs e) => await ConnectUsbAsync();
     private void btnDisconnect_Click(object sender, EventArgs e) => DisconnectUsb();
     private void btnApplyMapping_Click(object sender, EventArgs e) => SaveChannelMapping();
     private void btnPresetAetr_Click(object sender, EventArgs e) => ApplyMappingPreset("AETR");
@@ -1863,10 +1973,12 @@ public sealed partial class MainForm : Form
         _simPidSettings["mc_p_roll"] = 40;
         _simPidSettings["mc_i_roll"] = 50;
         _simPidSettings["mc_d_roll"] = 30;
+        _simPidSettings["mc_cd_roll"] = 40;
         _simPidSettings["mc_ff_roll"] = 40;
         _simPidSettings["mc_p_pitch"] = 40;
         _simPidSettings["mc_i_pitch"] = 50;
         _simPidSettings["mc_d_pitch"] = 30;
+        _simPidSettings["mc_cd_pitch"] = 40;
         _simPidSettings["mc_ff_pitch"] = 40;
         _simPidSettings["mc_p_yaw"] = 45;
         _simPidSettings["mc_i_yaw"] = 55;
@@ -1964,7 +2076,7 @@ public sealed partial class MainForm : Form
     private void btnManualPidPlus_Click(object sender, EventArgs e) => SendManualPidAdjustment("increase");
     private void btnManualPidMinus2_Click(object sender, EventArgs e) => SendManualPidAdjustmentFrom(cmbManualAxis2, cmbManualGain2, cmbManualPoints2, "decrease");
     private void btnManualPidPlus2_Click(object sender, EventArgs e) => SendManualPidAdjustmentFrom(cmbManualAxis2, cmbManualGain2, cmbManualPoints2, "increase");
-    private void btnReadFcPid_Click(object sender, EventArgs e) => ReadFcPidValues();
+    private async void btnReadFcPid_Click(object sender, EventArgs e) => await ReadFcPidValuesAsync();
     private void btnSaveFcPid_Click(object sender, EventArgs e) => SaveFcPidValues();
     private void btnPidEditable_Click(object sender, EventArgs e) => SetPidGridEditable(!_pidGridEditable);
     private void pnlScoreChart_Paint(object sender, PaintEventArgs e) => DrawScoreChart(e.Graphics, pnlScoreChart.ClientRectangle);
@@ -1999,4 +2111,8 @@ public sealed partial class MainForm : Form
         DirectionMetrics? Negative);
     private sealed record PidAdjustmentRecommendation(string Axis, string Gain, string Direction, int Points, string Message);
     private sealed record DirectionMetrics(double Score, IReadOnlyList<double> TimeData, IReadOnlyList<double> MovementData, double Command);
+    private sealed record PidSnapshotValues(
+        int? RollP, int? RollI, int? RollD, int? RollFf,
+        int? PitchP, int? PitchI, int? PitchD, int? PitchFf,
+        int? YawP, int? YawI, int? YawD, int? YawFf);
 }

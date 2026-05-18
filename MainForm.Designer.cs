@@ -30,7 +30,6 @@ partial class MainForm
         cboArduinoPort = new ComboBox();
         cboArduinoBaud = new ComboBox();
         cboTrainerPin = new ComboBox();
-        lblArduinoStatus = new Label();
         btnArduinoDisconnect = new Button();
         btnFcDisconnect = new Button();
         btnFcConnect = new Button();
@@ -38,6 +37,7 @@ partial class MainForm
         btnSimulationToggle = new Button();
         btnRefreshPorts = new Button();
         lblFCStatus = new Label();
+        lblArduinoStatus = new Label();
         grpMapping = new GroupBox();
         mappingTable = new TableLayoutPanel();
         lblRoll = new Label();
@@ -72,7 +72,7 @@ partial class MainForm
         pnlRightStickIndicator = new Panel();
         pnlLeftStick = new Panel();
         pnlLeftStickIndicator = new Panel();
-        button1 = new Button();
+        btnSetThrottle = new Button();
         grpPidWorkflow = new GroupBox();
         tblPidMatrix = new TableLayoutPanel();
         lblPidHdrP = new Label();
@@ -110,14 +110,11 @@ partial class MainForm
         lblPitchAngleTitle = new Label();
         groupBox1 = new GroupBox();
         tableLayoutPanel4 = new TableLayoutPanel();
-        button2 = new Button();
-        button3 = new Button();
-        button5 = new Button();
-        button4 = new Button();
         btnTuneRoll = new Button();
+        btnTunePitch = new Button();
+        btnTuneYaw = new Button();
         lblActiveAxis = new Label();
         lblActiveAxisTitle = new Label();
-        btnTunePitch = new Button();
         btnRetestAxis = new Button();
         lblPidValuesTitle = new Label();
         btnFinishAxis = new Button();
@@ -175,8 +172,8 @@ partial class MainForm
         rootLayout.Padding = new Padding(10);
         rootLayout.RowCount = 3;
         rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 23.4908142F));
-        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 53.412075F));
-        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 23.0414753F));
+        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 23.2283459F));
+        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 53.280838F));
         rootLayout.Size = new Size(1567, 782);
         rootLayout.TabIndex = 0;
         // 
@@ -208,7 +205,6 @@ partial class MainForm
         tblUsb.Controls.Add(cboArduinoPort, 1, 1);
         tblUsb.Controls.Add(cboArduinoBaud, 2, 1);
         tblUsb.Controls.Add(cboTrainerPin, 1, 2);
-        tblUsb.Controls.Add(lblArduinoStatus, 3, 3);
         tblUsb.Controls.Add(btnArduinoDisconnect, 4, 0);
         tblUsb.Controls.Add(btnFcDisconnect, 4, 1);
         tblUsb.Controls.Add(btnFcConnect, 3, 0);
@@ -216,6 +212,7 @@ partial class MainForm
         tblUsb.Controls.Add(btnSimulationToggle, 4, 2);
         tblUsb.Controls.Add(btnRefreshPorts, 3, 2);
         tblUsb.Controls.Add(lblFCStatus, 1, 3);
+        tblUsb.Controls.Add(lblArduinoStatus, 4, 3);
         tblUsb.Dock = DockStyle.Left;
         tblUsb.Location = new Point(10, 26);
         tblUsb.Name = "tblUsb";
@@ -311,18 +308,6 @@ partial class MainForm
         cboTrainerPin.Size = new Size(67, 23);
         cboTrainerPin.TabIndex = 16;
         // 
-        // lblArduinoStatus
-        // 
-        tblUsb.SetColumnSpan(lblArduinoStatus, 2);
-        lblArduinoStatus.Dock = DockStyle.Top;
-        lblArduinoStatus.Location = new Point(254, 102);
-        lblArduinoStatus.Margin = new Padding(3, 3, 3, 0);
-        lblArduinoStatus.Name = "lblArduinoStatus";
-        lblArduinoStatus.Size = new Size(285, 24);
-        lblArduinoStatus.TabIndex = 14;
-        lblArduinoStatus.Text = "Waiting...";
-        lblArduinoStatus.TextAlign = ContentAlignment.MiddleLeft;
-        // 
         // btnArduinoDisconnect
         // 
         btnArduinoDisconnect.Dock = DockStyle.Top;
@@ -391,15 +376,26 @@ partial class MainForm
         // 
         // lblFCStatus
         // 
-        tblUsb.SetColumnSpan(lblFCStatus, 2);
+        tblUsb.SetColumnSpan(lblFCStatus, 3);
         lblFCStatus.Dock = DockStyle.Top;
         lblFCStatus.Location = new Point(65, 102);
         lblFCStatus.Margin = new Padding(3, 3, 3, 0);
         lblFCStatus.Name = "lblFCStatus";
-        lblFCStatus.Size = new Size(183, 24);
+        lblFCStatus.Size = new Size(297, 24);
         lblFCStatus.TabIndex = 13;
         lblFCStatus.Text = "Waiting...";
         lblFCStatus.TextAlign = ContentAlignment.MiddleLeft;
+        // 
+        // lblArduinoStatus
+        // 
+        lblArduinoStatus.Dock = DockStyle.Top;
+        lblArduinoStatus.Location = new Point(368, 102);
+        lblArduinoStatus.Margin = new Padding(3, 3, 3, 0);
+        lblArduinoStatus.Name = "lblArduinoStatus";
+        lblArduinoStatus.Size = new Size(171, 24);
+        lblArduinoStatus.TabIndex = 14;
+        lblArduinoStatus.Text = "Waiting...";
+        lblArduinoStatus.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // grpMapping
         // 
@@ -591,7 +587,7 @@ partial class MainForm
         // grpChannelTest
         // 
         grpChannelTest.Controls.Add(tableLayoutPanel1);
-        grpChannelTest.Controls.Add(button1);
+        grpChannelTest.Controls.Add(btnSetThrottle);
         grpChannelTest.Dock = DockStyle.Top;
         grpChannelTest.Location = new Point(855, 13);
         grpChannelTest.Name = "grpChannelTest";
@@ -839,16 +835,16 @@ partial class MainForm
         pnlLeftStickIndicator.Size = new Size(10, 10);
         pnlLeftStickIndicator.TabIndex = 0;
         // 
-        // button1
+        // btnSetThrottle
         // 
-        button1.Anchor = AnchorStyles.Left;
-        button1.Location = new Point(608, 120);
-        button1.Name = "button1";
-        button1.Size = new Size(81, 32);
-        button1.TabIndex = 0;
-        button1.Text = "<-- Set";
-        button1.TextAlign = ContentAlignment.MiddleLeft;
-        button1.UseVisualStyleBackColor = true;
+        btnSetThrottle.Anchor = AnchorStyles.Left;
+        btnSetThrottle.Location = new Point(608, 120);
+        btnSetThrottle.Name = "btnSetThrottle";
+        btnSetThrottle.Size = new Size(81, 32);
+        btnSetThrottle.TabIndex = 0;
+        btnSetThrottle.Text = "<-- Set";
+        btnSetThrottle.TextAlign = ContentAlignment.MiddleLeft;
+        btnSetThrottle.UseVisualStyleBackColor = true;
         // 
         // grpPidWorkflow
         // 
@@ -1133,9 +1129,9 @@ partial class MainForm
         pnlScoreChart.BorderStyle = BorderStyle.FixedSingle;
         rootLayout.SetColumnSpan(pnlScoreChart, 3);
         pnlScoreChart.Dock = DockStyle.Fill;
-        pnlScoreChart.Location = new Point(13, 599);
+        pnlScoreChart.Location = new Point(13, 369);
         pnlScoreChart.Name = "pnlScoreChart";
-        pnlScoreChart.Size = new Size(1541, 170);
+        pnlScoreChart.Size = new Size(1541, 400);
         pnlScoreChart.TabIndex = 0;
         pnlScoreChart.Paint += pnlScoreChart_Paint;
         // 
@@ -1261,10 +1257,9 @@ partial class MainForm
         // 
         tableLayoutPanel4.ColumnCount = 1;
         tableLayoutPanel4.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        tableLayoutPanel4.Controls.Add(button2, 0, 0);
-        tableLayoutPanel4.Controls.Add(button3, 0, 1);
-        tableLayoutPanel4.Controls.Add(button5, 0, 3);
-        tableLayoutPanel4.Controls.Add(button4, 0, 2);
+        tableLayoutPanel4.Controls.Add(btnTuneRoll, 0, 0);
+        tableLayoutPanel4.Controls.Add(btnTunePitch, 0, 1);
+        tableLayoutPanel4.Controls.Add(btnTuneYaw, 0, 2);
         tableLayoutPanel4.Dock = DockStyle.Left;
         tableLayoutPanel4.Location = new Point(3, 19);
         tableLayoutPanel4.Name = "tableLayoutPanel4";
@@ -1276,55 +1271,37 @@ partial class MainForm
         tableLayoutPanel4.Size = new Size(93, 149);
         tableLayoutPanel4.TabIndex = 8;
         // 
-        // button2
-        // 
-        button2.AutoSize = true;
-        button2.Location = new Point(3, 3);
-        button2.Name = "button2";
-        button2.Size = new Size(84, 26);
-        button2.TabIndex = 4;
-        button2.Text = "Test Roll";
-        button2.UseVisualStyleBackColor = true;
-        // 
-        // button3
-        // 
-        button3.AutoSize = true;
-        button3.Location = new Point(3, 40);
-        button3.Name = "button3";
-        button3.Size = new Size(84, 26);
-        button3.TabIndex = 5;
-        button3.Text = "Test Pitch";
-        button3.UseVisualStyleBackColor = true;
-        // 
-        // button5
-        // 
-        button5.AutoSize = true;
-        button5.Location = new Point(3, 114);
-        button5.Name = "button5";
-        button5.Size = new Size(84, 25);
-        button5.TabIndex = 7;
-        button5.Text = "Test Yaw";
-        button5.UseVisualStyleBackColor = true;
-        // 
-        // button4
-        // 
-        button4.AutoSize = true;
-        button4.Location = new Point(3, 77);
-        button4.Name = "button4";
-        button4.Size = new Size(84, 26);
-        button4.TabIndex = 6;
-        button4.Text = "Test Throttle";
-        button4.UseVisualStyleBackColor = true;
-        // 
         // btnTuneRoll
         // 
-        btnTuneRoll.Location = new Point(896, 39);
+        btnTuneRoll.AutoSize = true;
+        btnTuneRoll.Location = new Point(3, 3);
         btnTuneRoll.Name = "btnTuneRoll";
-        btnTuneRoll.Size = new Size(98, 34);
-        btnTuneRoll.TabIndex = 0;
-        btnTuneRoll.Text = "Roll";
+        btnTuneRoll.Size = new Size(84, 26);
+        btnTuneRoll.TabIndex = 4;
+        btnTuneRoll.Text = "Tune Roll";
         btnTuneRoll.UseVisualStyleBackColor = true;
         btnTuneRoll.Click += btnTuneRoll_Click;
+        // 
+        // btnTunePitch
+        // 
+        btnTunePitch.AutoSize = true;
+        btnTunePitch.Location = new Point(3, 40);
+        btnTunePitch.Name = "btnTunePitch";
+        btnTunePitch.Size = new Size(84, 26);
+        btnTunePitch.TabIndex = 5;
+        btnTunePitch.Text = "Tune Pitch";
+        btnTunePitch.UseVisualStyleBackColor = true;
+        btnTunePitch.Click += btnTunePitch_Click;
+        // 
+        // btnTuneYaw
+        // 
+        btnTuneYaw.AutoSize = true;
+        btnTuneYaw.Location = new Point(3, 77);
+        btnTuneYaw.Name = "btnTuneYaw";
+        btnTuneYaw.Size = new Size(84, 26);
+        btnTuneYaw.TabIndex = 6;
+        btnTuneYaw.Text = "Tune Yaw";
+        btnTuneYaw.UseVisualStyleBackColor = true;
         // 
         // lblActiveAxis
         // 
@@ -1344,16 +1321,6 @@ partial class MainForm
         lblActiveAxisTitle.TabIndex = 1;
         lblActiveAxisTitle.Text = "Active Axis:";
         lblActiveAxisTitle.Click += lblActiveAxisTitle_Click;
-        // 
-        // btnTunePitch
-        // 
-        btnTunePitch.Location = new Point(1002, 39);
-        btnTunePitch.Name = "btnTunePitch";
-        btnTunePitch.Size = new Size(98, 34);
-        btnTunePitch.TabIndex = 1;
-        btnTunePitch.Text = "Pitch";
-        btnTunePitch.UseVisualStyleBackColor = true;
-        btnTunePitch.Click += btnTunePitch_Click;
         // 
         // btnRetestAxis
         // 
@@ -1587,8 +1554,6 @@ partial class MainForm
     private TextBox txtYawD;
     private TextBox txtYawFf;
     private Button btnPidEditable;
-    private Button btnTuneRoll;
-    private Button btnTunePitch;
     private Button btnRetestAxis;
     private Button btnFinishAxis;
     private Button btnApplyRecommendedPid;
@@ -1640,11 +1605,10 @@ partial class MainForm
     private TableLayoutPanel tableLayoutPanel3;
     private GroupBox grpLiveData;
     private GroupBox groupBox1;
-    private Button button1;
-    private Button button2;
-    private Button button3;
-    private Button button4;
-    private Button button5;
+    private Button btnSetThrottle;
+    private Button btnTuneRoll;
+    private Button btnTunePitch;
+    private Button btnTuneYaw;
     private TableLayoutPanel tableLayoutPanel4;
 }
 
