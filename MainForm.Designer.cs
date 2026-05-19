@@ -36,8 +36,8 @@ partial class MainForm
         btnArduinoConnect = new Button();
         btnSimulationToggle = new Button();
         btnRefreshPorts = new Button();
-        lblFCStatus = new Label();
         lblArduinoStatus = new Label();
+        lblFCStatus = new Label();
         grpMapping = new GroupBox();
         mappingTable = new TableLayoutPanel();
         lblRoll = new Label();
@@ -99,6 +99,7 @@ partial class MainForm
         btnSaveFcPid = new Button();
         pnlScoreChart = new Panel();
         grpLiveData = new GroupBox();
+        attitudeIndicator = new DronePidTuningAssistant.WinForms.Controls.AttitudeIndicatorControl();
         tableLayoutPanel3 = new TableLayoutPanel();
         lblPitchAngle = new Label();
         lblRollAngle = new Label();
@@ -171,10 +172,10 @@ partial class MainForm
         rootLayout.Name = "rootLayout";
         rootLayout.Padding = new Padding(10);
         rootLayout.RowCount = 3;
-        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 27.5720158F));
-        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 19.067215F));
-        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 53.280838F));
-        rootLayout.Size = new Size(1370, 749);
+        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 31.97531F));
+        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 36.2962952F));
+        rootLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 31.7283955F));
+        rootLayout.Size = new Size(1725, 830);
         rootLayout.TabIndex = 0;
         // 
         // grpUsb
@@ -184,7 +185,7 @@ partial class MainForm
         grpUsb.Location = new Point(13, 13);
         grpUsb.Name = "grpUsb";
         grpUsb.Padding = new Padding(10);
-        grpUsb.Size = new Size(520, 195);
+        grpUsb.Size = new Size(658, 195);
         grpUsb.TabIndex = 0;
         grpUsb.TabStop = false;
         grpUsb.Text = "Serial Ports";
@@ -375,18 +376,6 @@ partial class MainForm
         btnRefreshPorts.UseVisualStyleBackColor = true;
         btnRefreshPorts.Click += btnRefreshPorts_Click;
         // 
-        // lblFCStatus
-        // 
-        tblUsb.SetColumnSpan(lblFCStatus, 3);
-        lblFCStatus.Dock = DockStyle.Top;
-        lblFCStatus.Location = new Point(3, 120);
-        lblFCStatus.Margin = new Padding(3, 3, 3, 0);
-        lblFCStatus.Name = "lblFCStatus";
-        lblFCStatus.Size = new Size(243, 25);
-        lblFCStatus.TabIndex = 13;
-        lblFCStatus.Text = "Waiting...";
-        lblFCStatus.TextAlign = ContentAlignment.MiddleLeft;
-        // 
         // lblArduinoStatus
         // 
         tblUsb.SetColumnSpan(lblArduinoStatus, 2);
@@ -399,14 +388,26 @@ partial class MainForm
         lblArduinoStatus.Text = "Waiting...";
         lblArduinoStatus.TextAlign = ContentAlignment.MiddleLeft;
         // 
+        // lblFCStatus
+        // 
+        tblUsb.SetColumnSpan(lblFCStatus, 3);
+        lblFCStatus.Dock = DockStyle.Top;
+        lblFCStatus.Location = new Point(3, 120);
+        lblFCStatus.Margin = new Padding(3, 3, 3, 0);
+        lblFCStatus.Name = "lblFCStatus";
+        lblFCStatus.Size = new Size(243, 25);
+        lblFCStatus.TabIndex = 13;
+        lblFCStatus.Text = "Waiting...";
+        lblFCStatus.TextAlign = ContentAlignment.MiddleLeft;
+        // 
         // grpMapping
         // 
         grpMapping.Controls.Add(mappingTable);
         grpMapping.Dock = DockStyle.Top;
-        grpMapping.Location = new Point(539, 13);
+        grpMapping.Location = new Point(677, 13);
         grpMapping.Name = "grpMapping";
         grpMapping.Padding = new Padding(10);
-        grpMapping.Size = new Size(236, 165);
+        grpMapping.Size = new Size(299, 165);
         grpMapping.TabIndex = 1;
         grpMapping.TabStop = false;
         grpMapping.Text = "Transmitter Channel Mapping";
@@ -592,10 +593,10 @@ partial class MainForm
         grpChannelTest.Controls.Add(tableLayoutPanel1);
         grpChannelTest.Controls.Add(btnSetThrottle);
         grpChannelTest.Dock = DockStyle.Top;
-        grpChannelTest.Location = new Point(781, 13);
+        grpChannelTest.Location = new Point(982, 13);
         grpChannelTest.Name = "grpChannelTest";
         grpChannelTest.Padding = new Padding(10);
-        grpChannelTest.Size = new Size(576, 163);
+        grpChannelTest.Size = new Size(730, 163);
         grpChannelTest.TabIndex = 0;
         grpChannelTest.TabStop = false;
         grpChannelTest.Text = "Channel Test";
@@ -853,10 +854,10 @@ partial class MainForm
         // 
         grpPidWorkflow.Controls.Add(tblPidMatrix);
         grpPidWorkflow.Dock = DockStyle.Top;
-        grpPidWorkflow.Location = new Point(13, 214);
+        grpPidWorkflow.Location = new Point(13, 272);
         grpPidWorkflow.Name = "grpPidWorkflow";
         grpPidWorkflow.Padding = new Padding(10);
-        grpPidWorkflow.Size = new Size(520, 133);
+        grpPidWorkflow.Size = new Size(658, 133);
         grpPidWorkflow.TabIndex = 2;
         grpPidWorkflow.TabStop = false;
         grpPidWorkflow.Text = "PID";
@@ -1132,22 +1133,34 @@ partial class MainForm
         pnlScoreChart.BorderStyle = BorderStyle.FixedSingle;
         rootLayout.SetColumnSpan(pnlScoreChart, 3);
         pnlScoreChart.Dock = DockStyle.Fill;
-        pnlScoreChart.Location = new Point(13, 353);
+        pnlScoreChart.Location = new Point(13, 566);
         pnlScoreChart.Name = "pnlScoreChart";
-        pnlScoreChart.Size = new Size(1344, 383);
+        pnlScoreChart.Size = new Size(1699, 251);
         pnlScoreChart.TabIndex = 0;
         pnlScoreChart.Paint += pnlScoreChart_Paint;
         // 
         // grpLiveData
         // 
+        grpLiveData.Controls.Add(attitudeIndicator);
         grpLiveData.Controls.Add(tableLayoutPanel3);
         grpLiveData.Dock = DockStyle.Top;
-        grpLiveData.Location = new Point(539, 214);
+        grpLiveData.Location = new Point(677, 272);
         grpLiveData.Name = "grpLiveData";
-        grpLiveData.Size = new Size(236, 133);
+        grpLiveData.Size = new Size(299, 288);
         grpLiveData.TabIndex = 9;
         grpLiveData.TabStop = false;
         grpLiveData.Text = "Live";
+        // 
+        // attitudeIndicator
+        // 
+        attitudeIndicator.BackColor = Color.FromArgb(175, 175, 175);
+        attitudeIndicator.Dock = DockStyle.Fill;
+        attitudeIndicator.Location = new Point(3, 96);
+        attitudeIndicator.Name = "attitudeIndicator";
+        attitudeIndicator.PitchDeg = 0D;
+        attitudeIndicator.RollDeg = 0D;
+        attitudeIndicator.Size = new Size(293, 189);
+        attitudeIndicator.TabIndex = 9;
         // 
         // tableLayoutPanel3
         // 
@@ -1170,13 +1183,13 @@ partial class MainForm
         tableLayoutPanel3.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
         tableLayoutPanel3.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
         tableLayoutPanel3.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
-        tableLayoutPanel3.Size = new Size(230, 77);
+        tableLayoutPanel3.Size = new Size(293, 77);
         tableLayoutPanel3.TabIndex = 8;
         // 
         // lblPitchAngle
         // 
         lblPitchAngle.Anchor = AnchorStyles.Left;
-        lblPitchAngle.Location = new Point(86, 59);
+        lblPitchAngle.Location = new Point(109, 59);
         lblPitchAngle.Name = "lblPitchAngle";
         lblPitchAngle.Size = new Size(27, 15);
         lblPitchAngle.TabIndex = 7;
@@ -1185,7 +1198,7 @@ partial class MainForm
         // lblRollAngle
         // 
         lblRollAngle.Anchor = AnchorStyles.Left;
-        lblRollAngle.Location = new Point(86, 40);
+        lblRollAngle.Location = new Point(109, 40);
         lblRollAngle.Name = "lblRollAngle";
         lblRollAngle.Size = new Size(27, 15);
         lblRollAngle.TabIndex = 5;
@@ -1194,7 +1207,7 @@ partial class MainForm
         // lblChannelValue
         // 
         lblChannelValue.Anchor = AnchorStyles.Left;
-        lblChannelValue.Location = new Point(86, 21);
+        lblChannelValue.Location = new Point(109, 21);
         lblChannelValue.Name = "lblChannelValue";
         lblChannelValue.Size = new Size(46, 15);
         lblChannelValue.TabIndex = 3;
@@ -1203,7 +1216,7 @@ partial class MainForm
         // lblChannelVisual
         // 
         lblChannelVisual.Anchor = AnchorStyles.Left;
-        lblChannelVisual.Location = new Point(86, 0);
+        lblChannelVisual.Location = new Point(109, 0);
         lblChannelVisual.Name = "lblChannelVisual";
         lblChannelVisual.Size = new Size(101, 19);
         lblChannelVisual.TabIndex = 1;
@@ -1249,9 +1262,9 @@ partial class MainForm
         // 
         groupBox1.Controls.Add(tableLayoutPanel4);
         groupBox1.Dock = DockStyle.Top;
-        groupBox1.Location = new Point(781, 214);
+        groupBox1.Location = new Point(982, 272);
         groupBox1.Name = "groupBox1";
-        groupBox1.Size = new Size(576, 133);
+        groupBox1.Size = new Size(730, 133);
         groupBox1.TabIndex = 10;
         groupBox1.TabStop = false;
         groupBox1.Text = "Tune PID";
@@ -1468,7 +1481,7 @@ partial class MainForm
         // 
         AutoScaleDimensions = new SizeF(7F, 15F);
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(1370, 749);
+        ClientSize = new Size(1725, 830);
         Controls.Add(rootLayout);
         MinimumSize = new Size(898, 475);
         Name = "MainForm";
@@ -1607,6 +1620,7 @@ partial class MainForm
     private TableLayoutPanel tableLayoutPanel2;
     private TableLayoutPanel tableLayoutPanel3;
     private GroupBox grpLiveData;
+    private Controls.AttitudeIndicatorControl attitudeIndicator;
     private GroupBox groupBox1;
     private Button btnSetThrottle;
     private Button btnTuneRoll;

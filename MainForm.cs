@@ -522,8 +522,8 @@ public sealed partial class MainForm : Form
             ? "No FC ports found."
             : $"Found {ports.Count} port(s).";
         _arduinoTransientStatus = ports.Count == 0
-            ? $"No Arduino ports found. Baud: {_arduinoBaudRate}"
-            : $"Found {ports.Count} port(s). Baud: {_arduinoBaudRate}";
+            ? "No Arduino ports found."
+            : $"Found {ports.Count} port(s).";
         SetWorkflowStatus(ports.Count == 0
             ? "No serial ports detected."
             : $"Detected {ports.Count} serial port(s).");
@@ -684,7 +684,7 @@ public sealed partial class MainForm : Form
         UpdateSerialConnectionUi();
     }
 
-    private void ConnectArduinoUsb()
+    private async Task ConnectArduinoUsbAsync()
     {
         if (_simulationMode)
         {
@@ -707,9 +707,13 @@ public sealed partial class MainForm : Form
 
         try
         {
-            _arduinoTrainerClient.Connect(portName, baudRate);
-            _ = _arduinoTrainerClient.SetPin(GetSelectedTrainerPin());
-            var status = _arduinoTrainerClient.Begin();
+            var pin = GetSelectedTrainerPin();
+            var status = await Task.Run(() =>
+            {
+                _arduinoTrainerClient.Connect(portName, baudRate);
+                _ = _arduinoTrainerClient.SetPin(pin);
+                return _arduinoTrainerClient.Begin();
+            });
             _arduinoConnected = true;
             SetArduinoStatus($"Arduino connected: {portName}@{baudRate} (pin {status.OutputPin})");
             CenterArduinoFlightControls();
@@ -850,13 +854,13 @@ public sealed partial class MainForm : Form
             catch (Exception ex)
             {
                 _arduinoConnected = false;
-                SetArduinoStatus($"Arduino not connected. Baud set to {_arduinoBaudRate}.");
+                SetWorkflowStatus($"Arduino baud set to {_arduinoBaudRate}.");
                 MessageBox.Show(this, ex.Message, "Arduino reconnect failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
         else
         {
-            SetArduinoStatus($"Arduino not connected. Baud set to {_arduinoBaudRate}.");
+            SetWorkflowStatus($"Arduino baud set to {_arduinoBaudRate}.");
         }
         UpdateSerialConnectionUi();
     }
@@ -904,30 +908,36 @@ public sealed partial class MainForm : Form
             var fcPort = _serialPortService.ConnectedPortName ?? "COM?";
             var fcBaud = _serialPortService.ConnectedBaudRate > 0 ? _serialPortService.ConnectedBaudRate : _fcBaudRate;
             lblFCStatus.Text = $"FC connected: {fcPort}@{fcBaud}";
+            lblFCStatus.BackColor = Color.LightGreen;
             _fcTransientStatus = null;
         }
         else if (!string.IsNullOrWhiteSpace(_fcTransientStatus))
         {
             lblFCStatus.Text = _fcTransientStatus;
+            lblFCStatus.BackColor = SystemColors.Control;
         }
         else
         {
             lblFCStatus.Text = "FC not connected.";
+            lblFCStatus.BackColor = SystemColors.Control;
         }
 
         if (_arduinoConnected || _arduinoTrainerClient.IsConnected)
         {
             var arduinoPort = _arduinoTrainerClient.PortName ?? (cboArduinoPort.SelectedItem?.ToString() ?? "COM?");
             lblArduinoStatus.Text = $"Arduino connected: {arduinoPort}@{_arduinoBaudRate}";
+            lblArduinoStatus.BackColor = Color.LightGreen;
             _arduinoTransientStatus = null;
         }
         else if (!string.IsNullOrWhiteSpace(_arduinoTransientStatus))
         {
             lblArduinoStatus.Text = _arduinoTransientStatus;
+            lblArduinoStatus.BackColor = SystemColors.Control;
         }
         else
         {
-            lblArduinoStatus.Text = $"Arduino not connected. Baud: {_arduinoBaudRate}";
+            lblArduinoStatus.Text = "Arduino not connected.";
+            lblArduinoStatus.BackColor = SystemColors.Control;
         }
     }
 
@@ -977,6 +987,7 @@ public sealed partial class MainForm : Form
         var fcConnected = _serialPortService.IsConnected;
         var activePath = GetActiveControlPath();
         var canRunChannelTests = fcConnected || _simulationMode;
+        grpLiveData.Enabled = fcConnected;
 
         if (!_channelTestRunning)
         {
@@ -1159,6 +1170,13 @@ public sealed partial class MainForm : Form
         lblChannelValue.Text = $"{pulseUs} us";
         lblRollAngle.Text = $"{rollDeg:F1} deg";
         lblPitchAngle.Text = $"{pitchDeg:F1} deg";
+        UpdateAttitudeIndicator(rollDeg, pitchDeg);
+    }
+
+    private void UpdateAttitudeIndicator(double rollDeg, double pitchDeg)
+    {
+        attitudeIndicator.RollDeg = rollDeg;
+        attitudeIndicator.PitchDeg = pitchDeg;
     }
 
     private void SetChannelTestButtonsEnabled(bool enabled)
@@ -2049,7 +2067,7 @@ public sealed partial class MainForm : Form
     private void btnPresetAetr_Click(object sender, EventArgs e) => ApplyMappingPreset("AETR");
     private void btnPresetRtae_Click(object sender, EventArgs e) => ApplyMappingPreset("RTAE");
     private void btnPresetReat_Click(object sender, EventArgs e) => ApplyMappingPreset("REAT");
-    private void btnArduinoConnect_Click(object sender, EventArgs e) => ConnectArduinoUsb();
+    private async void btnArduinoConnect_Click(object sender, EventArgs e) => await ConnectArduinoUsbAsync();
     private void btnArduinoDisconnect_Click(object sender, EventArgs e) => DisconnectArduinoUsb();
     private async void btnTestRoll_Click(object sender, EventArgs e) => await RunChannelTestAsync("roll");
     private async void btnTestPitch_Click(object sender, EventArgs e) => await RunChannelTestAsync("pitch");
@@ -2113,7 +2131,9 @@ public sealed partial class MainForm : Form
     {
         if (!_simulationMode)
         {
-            return _serialPortService.ReadAttitude(timeoutSeconds);
+            var sample = _serialPortService.ReadAttitude(timeoutSeconds);
+            UpdateAttitudeIndicator(sample.RollDeg, sample.PitchDeg);
+            return sample;
         }
 
         var targetRoll = (GetDisplayedPulseForAxisCode("A") - 1500.0) / 500.0 * MaxCommandDeg;
@@ -2137,12 +2157,14 @@ public sealed partial class MainForm : Form
         var pitchNoise = (_simRandom.NextDouble() * 2.0 - 1.0) * noiseScale;
         var yawNoise = (_simRandom.NextDouble() * 2.0 - 1.0) * (noiseScale * 0.7);
 
-        return new AttitudeSample
+        var simSample = new AttitudeSample
         {
             RollDeg = _simRollDeg + rollNoise,
             PitchDeg = _simPitchDeg + pitchNoise,
             YawDeg = _simYawDeg + yawNoise,
         };
+        UpdateAttitudeIndicator(simSample.RollDeg, simSample.PitchDeg);
+        return simSample;
     }
 
     private int GetPidSettingInt(string settingName)
