@@ -26,6 +26,15 @@
   - On enable, PID boxes populate with safe defaults.
   - Channel tests allowed in simulation (no Arduino-required blocking dialog).
   - PID tuning runs in simulation now capture graph-series data so chart updates.
+- Serial port UX:
+  - FC and Arduino COM dropdowns now auto-select likely ports on refresh scan.
+  - FC Connect/Disconnect buttons now reflect real FC connection state.
+  - FC/Arduino status labels are connection-state focused (not PID workflow text).
+  - Status labels now show transient connection phases (scan/connect/found).
+  - Arduino connect is asynchronous so `Connecting...` status visibly renders.
+  - Baud dropdown defaults restored to `115200` at startup.
+  - Arduino disconnected status no longer shows baud text.
+  - FC/Arduino status labels use light green background when connected, default background when not connected.
 
 ## Safe Simulation PID Defaults
 - Roll: `P=40`, `I=50`, `D=30`, `FF=40`
