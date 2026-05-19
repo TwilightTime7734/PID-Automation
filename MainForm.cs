@@ -73,6 +73,10 @@ public sealed partial class MainForm : Form
     private double _ch4DisplayedPulseUs = 1500;
     private System.Windows.Forms.Timer? _stickAnimationTimer;
     private bool _pidGridEditable;
+    private System.Windows.Forms.Timer? _liveAttitudeTimer;
+    private bool _liveAttitudePollInProgress;
+    private bool _fcProbeInProgress;
+    private bool _arduinoProbeInProgress;
 
     // Stick UI controls for channel test visualizers
     private Panel _pnlLeftStick => pnlLeftStick;
@@ -116,6 +120,7 @@ public sealed partial class MainForm : Form
         cboCH4.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
         InitializePidWorkflow();
         InitializeStickVisuals();
+        InitializeLiveAttitudePolling();
         UpdateSimulationToggleVisual();
         SetPidGridEditable(false);
         UpdateSerialConnectionUi();
@@ -528,6 +533,8 @@ public sealed partial class MainForm : Form
             ? "No serial ports detected."
             : $"Detected {ports.Count} serial port(s).");
         UpdateSerialConnectionUi();
+        _ = DetectAndSelectFcPortAsync(ports);
+        _ = DetectAndSelectArduinoPortAsync(ports);
     }
 
     private void PopulatePortCombos(
@@ -779,6 +786,7 @@ public sealed partial class MainForm : Form
         cboTrainerPin.Enabled = !simulationEnabled;
         RefreshConnectionStatusLabels();
         UpdateWorkflowUiState();
+        UpdateLiveAttitudePollingState();
     }
 
     private static int GetSelectedBaud(ComboBox combo, int fallback)
@@ -1002,6 +1010,161 @@ public sealed partial class MainForm : Form
         SetPidButtonsEnabled(pidEnabled);
     }
 
+    private void InitializeLiveAttitudePolling()
+    {
+        _liveAttitudeTimer = new System.Windows.Forms.Timer
+        {
+            Interval = 150,
+        };
+        _liveAttitudeTimer.Tick += async (_, _) =>
+        {
+            if (_liveAttitudePollInProgress || !CanPollLiveAttitude())
+            {
+                return;
+            }
+
+            _liveAttitudePollInProgress = true;
+            try
+            {
+                var sample = await Task.Run(() => _serialPortService.ReadAttitude(0.35));
+                UpdateAttitudeIndicator(sample.RollDeg, sample.PitchDeg);
+            }
+            catch
+            {
+                // Keep UI responsive if one poll fails.
+            }
+            finally
+            {
+                _liveAttitudePollInProgress = false;
+            }
+        };
+    }
+
+    private bool CanPollLiveAttitude()
+    {
+        return _serialPortService.IsConnected
+            && !_fcConnectInProgress
+            && !_channelTestRunning
+            && !_pidSnapshotRefreshInProgress
+            && string.IsNullOrWhiteSpace(_activeAxis);
+    }
+
+    private void UpdateLiveAttitudePollingState()
+    {
+        if (_liveAttitudeTimer is null)
+        {
+            return;
+        }
+
+        if (CanPollLiveAttitude())
+        {
+            if (!_liveAttitudeTimer.Enabled)
+            {
+                _liveAttitudeTimer.Start();
+            }
+            return;
+        }
+
+        if (_liveAttitudeTimer.Enabled)
+        {
+            _liveAttitudeTimer.Stop();
+        }
+    }
+
+    private async Task DetectAndSelectFcPortAsync(IReadOnlyList<string> ports)
+    {
+        if (ports.Count == 0 || _serialPortService.IsConnected || _fcProbeInProgress || _isClosing)
+        {
+            return;
+        }
+
+        _fcProbeInProgress = true;
+        try
+        {
+            var detected = await Task.Run(() =>
+            {
+                foreach (var port in ports)
+                {
+                    try
+                    {
+                        using var probe = new SerialPortService();
+                        probe.Connect(port, _fcBaudRate);
+                        _ = probe.ReadAttitude(0.5);
+                        return port;
+                    }
+                    catch
+                    {
+                        // Not an INAV/FC telemetry port or not currently responsive.
+                    }
+                }
+
+                return (string?)null;
+            });
+
+            if (string.IsNullOrWhiteSpace(detected) || _serialPortService.IsConnected || _isClosing)
+            {
+                return;
+            }
+
+            if (cboPort.Items.Contains(detected))
+            {
+                cboPort.SelectedItem = detected;
+                SetFcStatus($"Detected INAV/FC on {detected}. Ready to connect.");
+            }
+        }
+        finally
+        {
+            _fcProbeInProgress = false;
+        }
+    }
+
+    private async Task DetectAndSelectArduinoPortAsync(IReadOnlyList<string> ports)
+    {
+        if (ports.Count == 0 || _arduinoConnected || _arduinoTrainerClient.IsConnected || _arduinoProbeInProgress || _isClosing)
+        {
+            return;
+        }
+
+        _arduinoProbeInProgress = true;
+        try
+        {
+            var detected = await Task.Run(() =>
+            {
+                foreach (var port in ports)
+                {
+                    try
+                    {
+                        using var probe = new ArduinoTrainerCableClient();
+                        probe.Connect(port, _arduinoBaudRate);
+                        _ = probe.GetStatus(0.9);
+                        return port;
+                    }
+                    catch
+                    {
+                        // Not the trainer-cable Arduino on this port.
+                    }
+                }
+
+                return (string?)null;
+            });
+
+            if (string.IsNullOrWhiteSpace(detected) || _arduinoConnected || _arduinoTrainerClient.IsConnected || _isClosing)
+            {
+                return;
+            }
+
+            if (cboArduinoPort.Items.Contains(detected))
+            {
+                cboArduinoPort.SelectedItem = detected;
+                SetArduinoStatus($"Detected Arduino trainer cable on {detected}. Ready to connect.");
+            }
+        }
+        finally
+        {
+            _arduinoProbeInProgress = false;
+        }
+    }
+
     private async Task RunChannelTestAsync(string control)
     {
         if (_channelTestRunning)
@@ -1168,15 +1331,14 @@ public sealed partial class MainForm : Form
     {
         lblChannelVisual.Text = status;
         lblChannelValue.Text = $"{pulseUs} us";
-        lblRollAngle.Text = $"{rollDeg:F1} deg";
-        lblPitchAngle.Text = $"{pitchDeg:F1} deg";
-        UpdateAttitudeIndicator(rollDeg, pitchDeg);
     }
 
     private void UpdateAttitudeIndicator(double rollDeg, double pitchDeg)
     {
         attitudeIndicator.RollDeg = rollDeg;
         attitudeIndicator.PitchDeg = pitchDeg;
+        lblRollAngle.Text = $"{rollDeg:F1} deg";
+        lblPitchAngle.Text = $"{pitchDeg:F1} deg";
     }
 
     private void SetChannelTestButtonsEnabled(bool enabled)
@@ -2048,6 +2210,8 @@ public sealed partial class MainForm : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         _isClosing = true;
+        _liveAttitudeTimer?.Stop();
+        _liveAttitudeTimer?.Dispose();
         DisconnectArduinoUsb();
         _serialPortService.Dispose();
 
