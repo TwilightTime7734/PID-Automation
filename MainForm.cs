@@ -36,6 +36,7 @@ public sealed partial class MainForm : Form
     private string? _arduinoTransientStatus;
     private bool _pidSnapshotRefreshInProgress;
     private bool _isClosing;
+    private bool _pidTuningRunning;
     private string? _activeAxis;
     private int _rollIteration;
     private int _pitchIteration;
@@ -77,6 +78,19 @@ public sealed partial class MainForm : Form
     private bool _liveAttitudePollInProgress;
     private bool _fcProbeInProgress;
     private bool _arduinoProbeInProgress;
+    private TextBox? _txtPidThrottleValue;
+    private TextBox? _txtPidAngleValue;
+    private int _pidTuneThrottleUs = 1150;
+    private Panel? _pidCompassPanel;
+    private Button? _btnCompassNorth;
+    private Button? _btnCompassSouth;
+    private Button? _btnCompassWest;
+    private Button? _btnCompassEast;
+    private Button? _btnCompassClear;
+    private double _pidCompassRollDeg;
+    private double _pidCompassPitchDeg;
+    private double _measuredRollDeg;
+    private double _measuredPitchDeg;
 
     // Stick UI controls for channel test visualizers
     private Panel _pnlLeftStick => pnlLeftStick;
@@ -119,10 +133,13 @@ public sealed partial class MainForm : Form
         cboCH3.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
         cboCH4.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
         InitializePidWorkflow();
+        InitializeTunePidCompassControl();
         InitializeStickVisuals();
         InitializeLiveAttitudePolling();
         UpdateSimulationToggleVisual();
         SetPidGridEditable(false);
+        btnThrottleNeg.Click += btnThrottleNeg_Click;
+        btnThrottlePos.Click += btnThrottlePos_Click;
         UpdateSerialConnectionUi();
     }
 
@@ -669,6 +686,8 @@ public sealed partial class MainForm : Form
                 null, null, null, null,
                 null, null, null, null);
             UpdateSerialConnectionUi();
+            await ReadFcPidValuesAsync();
+            await ValidateAcroModePrerequisitesAsync();
         }
         catch (Exception ex)
         {
@@ -1109,7 +1128,11 @@ public sealed partial class MainForm : Form
             if (cboPort.Items.Contains(detected))
             {
                 cboPort.SelectedItem = detected;
-                SetFcStatus($"Detected INAV/FC on {detected}. Ready to connect.");
+                SetFcStatus($"Detected INAV/FC on {detected}. Connecting...");
+                if (!_serialPortService.IsConnected && !_fcConnectInProgress)
+                {
+                    await ConnectUsbAsync();
+                }
             }
         }
         finally
@@ -1156,7 +1179,11 @@ public sealed partial class MainForm : Form
             if (cboArduinoPort.Items.Contains(detected))
             {
                 cboArduinoPort.SelectedItem = detected;
-                SetArduinoStatus($"Detected Arduino trainer cable on {detected}. Ready to connect.");
+                SetArduinoStatus($"Detected Arduino trainer cable on {detected}. Connecting...");
+                if (!_arduinoTrainerClient.IsConnected && !_arduinoConnectInProgress)
+                {
+                    await ConnectArduinoUsbAsync();
+                }
             }
         }
         finally
@@ -1220,9 +1247,18 @@ public sealed partial class MainForm : Form
             "throttle" => mapping.Throttle,
             _ => "-",
         };
+        var channelPulse = control switch
+        {
+            "roll" => GetDisplayedPulseForAxisCode("A"),
+            "pitch" => GetDisplayedPulseForAxisCode("E"),
+            "throttle" => GetDisplayedPulseForAxisCode("T"),
+            "yaw" => GetDisplayedPulseForAxisCode("R"),
+            _ => 1500,
+        };
 
         try
         {
+            SetChannelTestVisual("Channel connecting...", channelPulse, 0.0, 0.0);
             SetWorkflowStatus($"Testing {control} on {channelCode} via {DescribeActivePath()}...");
 
             if (settleMs > 0)
@@ -1339,6 +1375,9 @@ public sealed partial class MainForm : Form
         attitudeIndicator.PitchDeg = pitchDeg;
         lblRollAngle.Text = $"{rollDeg:F1} deg";
         lblPitchAngle.Text = $"{pitchDeg:F1} deg";
+        _measuredRollDeg = rollDeg;
+        _measuredPitchDeg = pitchDeg;
+        UpdatePidAngleDisplay();
     }
 
     private void SetChannelTestButtonsEnabled(bool enabled)
@@ -1429,6 +1468,29 @@ public sealed partial class MainForm : Form
         SetChannelPulseState(ChannelFromAxisCode("R"), 1500);
     }
 
+    private void CenterArduinoAttitudeControls()
+    {
+        if (_simulationMode)
+        {
+            SetChannelPulseState(ChannelFromAxisCode("A"), 1500);
+            SetChannelPulseState(ChannelFromAxisCode("E"), 1500);
+            SetChannelPulseState(ChannelFromAxisCode("R"), 1500);
+            return;
+        }
+
+        if (!_arduinoTrainerClient.IsConnected)
+        {
+            return;
+        }
+
+        _arduinoTrainerClient.SetChannelPulseUs(ChannelFromAxisCode("A"), 1500);
+        SetChannelPulseState(ChannelFromAxisCode("A"), 1500);
+        _arduinoTrainerClient.SetChannelPulseUs(ChannelFromAxisCode("E"), 1500);
+        SetChannelPulseState(ChannelFromAxisCode("E"), 1500);
+        _arduinoTrainerClient.SetChannelPulseUs(ChannelFromAxisCode("R"), 1500);
+        SetChannelPulseState(ChannelFromAxisCode("R"), 1500);
+    }
+
 
     private void InitializePidWorkflow()
     {
@@ -1466,7 +1528,168 @@ public sealed partial class MainForm : Form
         {
             cmbManualPoints2.SelectedIndex = 0;
         }
+
+        InitializeTunePidThrottleControls();
         UpdateWorkflowUiState();
+    }
+
+    private void InitializeTunePidThrottleControls()
+    {
+        btnThrottleNeg.Text = "Throttle -";
+        btnThrottlePos.Text = "Throttle +";
+        cmbManualAxis2.Visible = false;
+        cmbManualGain2.Visible = false;
+        cmbManualPoints2.Visible = false;
+        btnManualPidMinus2.Visible = false;
+        btnManualPidPlus2.Visible = false;
+
+        var textBoxes = tableLayoutPanel4.Controls
+            .OfType<TextBox>()
+            .OrderBy(tb => tableLayoutPanel4.GetRow(tb))
+            .ThenBy(tb => tableLayoutPanel4.GetColumn(tb))
+            .ToList();
+
+        _txtPidThrottleValue = textBoxes
+            .FirstOrDefault(tb => tb.Name.Contains("throttle", StringComparison.OrdinalIgnoreCase))
+            ?? textBoxes.FirstOrDefault();
+
+        _txtPidAngleValue = textBoxes
+            .FirstOrDefault(tb => tb.Name.Contains("angle", StringComparison.OrdinalIgnoreCase)
+                && !ReferenceEquals(tb, _txtPidThrottleValue))
+            ?? textBoxes.FirstOrDefault(tb => !ReferenceEquals(tb, _txtPidThrottleValue));
+
+        if (_txtPidThrottleValue is not null)
+        {
+            _txtPidThrottleValue.ReadOnly = true;
+            _txtPidThrottleValue.TextAlign = HorizontalAlignment.Center;
+            _txtPidThrottleValue.TabStop = false;
+        }
+
+        if (_txtPidAngleValue is not null)
+        {
+            _txtPidAngleValue.ReadOnly = true;
+            _txtPidAngleValue.TextAlign = HorizontalAlignment.Center;
+            _txtPidAngleValue.TabStop = false;
+        }
+
+        _pidTuneThrottleUs = Math.Max(1000, Math.Min(2000, (int)nudThrottleUs.Value));
+        UpdateTunePidThrottleDisplay();
+        UpdatePidAngleDisplay();
+    }
+
+    private void UpdateTunePidThrottleDisplay()
+    {
+        if (_txtPidThrottleValue is not null)
+        {
+            _txtPidThrottleValue.Text = _pidTuneThrottleUs.ToString(CultureInfo.InvariantCulture);
+        }
+    }
+
+    private void UpdatePidAngleDisplay()
+    {
+        if (_txtPidAngleValue is not null)
+        {
+            _txtPidAngleValue.Text = $"R:{_measuredRollDeg:+0.0;-0.0;0.0} P:{_measuredPitchDeg:+0.0;-0.0;0.0}";
+        }
+    }
+
+    private void AdjustTunePidThrottle(int deltaUs)
+    {
+        var target = Math.Max(1000, Math.Min(2000, _pidTuneThrottleUs + deltaUs));
+        if (target == _pidTuneThrottleUs)
+        {
+            return;
+        }
+
+        _pidTuneThrottleUs = target;
+        UpdateTunePidThrottleDisplay();
+
+        if (_arduinoConnected || _simulationMode)
+        {
+            SetArduinoAxisPulse("throttle", _pidTuneThrottleUs);
+        }
+
+        SetWorkflowStatus($"Tune PID throttle set to {_pidTuneThrottleUs}us.");
+    }
+
+    private void InitializeTunePidCompassControl()
+    {
+        if (_pidCompassPanel is not null)
+        {
+            return;
+        }
+
+        _pidCompassPanel = new Panel
+        {
+            Name = "pnlPidCompass",
+            Location = new Point(418, 145),
+            Size = new Size(148, 148),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+        };
+
+        _btnCompassNorth = new Button
+        {
+            Name = "btnCompassNorth",
+            Text = "N",
+            Size = new Size(42, 34),
+            Location = new Point(53, 2),
+        };
+        _btnCompassSouth = new Button
+        {
+            Name = "btnCompassSouth",
+            Text = "S",
+            Size = new Size(42, 34),
+            Location = new Point(53, 112),
+        };
+        _btnCompassWest = new Button
+        {
+            Name = "btnCompassWest",
+            Text = "W",
+            Size = new Size(42, 34),
+            Location = new Point(2, 57),
+        };
+        _btnCompassEast = new Button
+        {
+            Name = "btnCompassEast",
+            Text = "E",
+            Size = new Size(42, 34),
+            Location = new Point(104, 57),
+        };
+        _btnCompassClear = new Button
+        {
+            Name = "btnCompassClear",
+            Text = "Clear",
+            Size = new Size(50, 34),
+            Location = new Point(49, 57),
+        };
+
+        _btnCompassNorth.Click += btnCompassNorth_Click;
+        _btnCompassSouth.Click += btnCompassSouth_Click;
+        _btnCompassWest.Click += btnCompassWest_Click;
+        _btnCompassEast.Click += btnCompassEast_Click;
+        _btnCompassClear.Click += btnCompassClear_Click;
+
+        _pidCompassPanel.Controls.Add(_btnCompassNorth);
+        _pidCompassPanel.Controls.Add(_btnCompassSouth);
+        _pidCompassPanel.Controls.Add(_btnCompassWest);
+        _pidCompassPanel.Controls.Add(_btnCompassEast);
+        _pidCompassPanel.Controls.Add(_btnCompassClear);
+        groupBox1.Controls.Add(_pidCompassPanel);
+        _pidCompassPanel.BringToFront();
+    }
+
+    private void ApplyPidCompassCommand()
+    {
+        if (!_arduinoConnected && !_simulationMode)
+        {
+            SetWorkflowStatus("Connect Arduino or enable simulation to use PID compass controls.");
+            return;
+        }
+
+        SetArduinoAxisPulse("roll", ToPulseFromCommandDeg(_pidCompassRollDeg));
+        SetArduinoAxisPulse("pitch", ToPulseFromCommandDeg(_pidCompassPitchDeg));
+        UpdatePidAngleDisplay();
+        SetWorkflowStatus($"PID compass command: roll {_pidCompassRollDeg:+0;-0;0} deg, pitch {_pidCompassPitchDeg:+0;-0;0} deg.");
     }
 
     private async Task RunPidTuningRoundAsync(string axis, bool resetAxis)
@@ -1492,6 +1715,7 @@ public sealed partial class MainForm : Form
         SetWorkflowStatus($"Running {axis} tuning round {iteration}...");
         SetPidButtonsEnabled(false);
         SetChannelTestButtonsEnabled(false);
+        _pidTuningRunning = true;
 
         try
         {
@@ -1503,10 +1727,9 @@ public sealed partial class MainForm : Form
                 var baseline = await RecordAxisBaselineRateAsync(axis, Math.Max(0.3, (double)nudBaselineSec.Value));
                 var targetDeg = Math.Max(5.0, (double)nudTargetDeg.Value);
                 var durationSec = 5.0;
-                var throttleUs = (int)nudThrottleUs.Value;
-                positiveMetrics = await CaptureDirectionMetricsAsync(axis, Math.Abs(targetDeg), durationSec, baseline, throttleUs);
+                positiveMetrics = await CaptureDirectionMetricsAsync(axis, Math.Abs(targetDeg), durationSec, baseline);
                 await Task.Delay(250);
-                negativeMetrics = await CaptureDirectionMetricsAsync(axis, -Math.Abs(targetDeg), durationSec, baseline, throttleUs);
+                negativeMetrics = await CaptureDirectionMetricsAsync(axis, -Math.Abs(targetDeg), durationSec, baseline);
                 score = (positiveMetrics.Score + negativeMetrics.Score) / 2.0;
             }
             else
@@ -1529,6 +1752,12 @@ public sealed partial class MainForm : Form
         }
         finally
         {
+            _pidTuningRunning = false;
+            if (_arduinoConnected || _simulationMode)
+            {
+                CenterArduinoAttitudeControls();
+            }
+            ResetSimulationAttitudeIfIdle();
             UpdateWorkflowUiState();
         }
     }
@@ -1576,7 +1805,7 @@ public sealed partial class MainForm : Form
         var rates = new List<double>();
         var endAt = DateTime.UtcNow.AddSeconds(durationSec);
 
-        CenterArduinoFlightControls();
+        CenterArduinoAttitudeControls();
         while (DateTime.UtcNow < endAt)
         {
             await Task.Delay(50);
@@ -1594,7 +1823,7 @@ public sealed partial class MainForm : Form
         return rates.Count == 0 ? 0.0 : rates.Average();
     }
 
-    private async Task<DirectionMetrics> CaptureDirectionMetricsAsync(string axis, double commandDeg, double durationSec, double baselineRate, int throttleUs)
+    private async Task<DirectionMetrics> CaptureDirectionMetricsAsync(string axis, double commandDeg, double durationSec, double baselineRate)
     {
         var target = Math.Max(1.0, Math.Abs(commandDeg));
         var start = DateTime.UtcNow;
@@ -1611,7 +1840,6 @@ public sealed partial class MainForm : Form
 
         if (_arduinoConnected)
         {
-            SetArduinoAxisPulse("throttle", throttleUs);
             SetArduinoAxisPulse(axis, commandPulse);
             commandActive = true;
         }
@@ -1637,7 +1865,7 @@ public sealed partial class MainForm : Form
 
                 if (commandActive && Math.Abs(angleDelta) >= target)
                 {
-                    CenterArduinoFlightControls();
+                    CenterArduinoAttitudeControls();
                     commandActive = false;
                     reachedTarget = true;
                 }
@@ -1650,7 +1878,7 @@ public sealed partial class MainForm : Form
         {
             if (_arduinoConnected)
             {
-                CenterArduinoFlightControls();
+                CenterArduinoAttitudeControls();
             }
         }
 
@@ -1755,6 +1983,8 @@ public sealed partial class MainForm : Form
         btnManualPidPlus.Enabled = enabled;
         btnManualPidMinus2.Enabled = enabled;
         btnManualPidPlus2.Enabled = enabled;
+        btnThrottleNeg.Enabled = enabled;
+        btnThrottlePos.Enabled = enabled;
         btnReadFcPid.Enabled = enabled;
         btnSaveFcPid.Enabled = enabled;
         btnPidEditable.Enabled = enabled;
@@ -2090,7 +2320,22 @@ public sealed partial class MainForm : Form
     {
         _activeAxis = null;
         lblActiveAxis.Text = "N/A";
+        ResetSimulationAttitudeIfIdle();
         SetWorkflowStatus("Axis tuning finished.");
+    }
+
+    private void ResetSimulationAttitudeIfIdle()
+    {
+        if (!_simulationMode || _channelTestRunning || _pidTuningRunning)
+        {
+            return;
+        }
+
+        _simRollDeg = 0.0;
+        _simPitchDeg = 0.0;
+        _simYawDeg = 0.0;
+        _simLastAttitudeAt = DateTime.UtcNow;
+        UpdateAttitudeIndicator(0.0, 0.0);
     }
 
     private void DrawScoreChart(Graphics g, Rectangle bounds)
@@ -2331,6 +2576,48 @@ public sealed partial class MainForm : Form
         return simSample;
     }
 
+    private async Task ValidateAcroModePrerequisitesAsync()
+    {
+        if (!_serialPortService.IsConnected)
+        {
+            return;
+        }
+
+        try
+        {
+            var snapshot = await Task.Run(() => _serialPortService.ReadModeValidation(1.0));
+            var airmodeOff = snapshot.AirmodeType.HasValue && snapshot.AirmodeType.Value <= 0 && !snapshot.AirmodeActive;
+            var selfLevelingOn = snapshot.SelfLevelingActive;
+
+            if (!airmodeOff && !selfLevelingOn)
+            {
+                return;
+            }
+
+            var issues = new List<string>();
+            if (airmodeOff)
+            {
+                issues.Add("Airmode appears OFF.");
+            }
+            if (selfLevelingOn)
+            {
+                issues.Add("Self-leveling mode is active (ANGLE/HORIZON).");
+            }
+
+            var activeModesText = snapshot.ActiveModes.Count > 0
+                ? string.Join(", ", snapshot.ActiveModes)
+                : "none detected";
+
+            var message = $"FC tuning prerequisites check:\n- {string.Join("\n- ", issues)}\n\nActive modes: {activeModesText}";
+            MessageBox.Show(this, message, "FC Mode Check", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            SetWorkflowStatus($"FC mode check warning: {string.Join(" ", issues)}");
+        }
+        catch (Exception ex)
+        {
+            SetWorkflowStatus($"FC mode check skipped: {ex.Message}");
+        }
+    }
+
     private int GetPidSettingInt(string settingName)
     {
         if (_simulationMode)
@@ -2369,8 +2656,40 @@ public sealed partial class MainForm : Form
     private void btnApplyRecommendedPid_Click(object sender, EventArgs e) => ApplyRecommendedPid();
     private void btnManualPidMinus_Click(object sender, EventArgs e) => SendManualPidAdjustment("decrease");
     private void btnManualPidPlus_Click(object sender, EventArgs e) => SendManualPidAdjustment("increase");
-    private void btnManualPidMinus2_Click(object sender, EventArgs e) => SendManualPidAdjustmentFrom(cmbManualAxis2, cmbManualGain2, cmbManualPoints2, "decrease");
-    private void btnManualPidPlus2_Click(object sender, EventArgs e) => SendManualPidAdjustmentFrom(cmbManualAxis2, cmbManualGain2, cmbManualPoints2, "increase");
+    private void btnThrottleNeg_Click(object sender, EventArgs e) => AdjustTunePidThrottle(-10);
+    private void btnThrottlePos_Click(object sender, EventArgs e) => AdjustTunePidThrottle(+10);
+    private void btnManualPidMinus2_Click(object sender, EventArgs e) => btnThrottleNeg_Click(sender, e);
+    private void btnManualPidPlus2_Click(object sender, EventArgs e) => btnThrottlePos_Click(sender, e);
+    private void btnCompassNorth_Click(object? sender, EventArgs e)
+    {
+        _pidCompassPitchDeg = 10.0;
+        ApplyPidCompassCommand();
+    }
+
+    private void btnCompassSouth_Click(object? sender, EventArgs e)
+    {
+        _pidCompassPitchDeg = -10.0;
+        ApplyPidCompassCommand();
+    }
+
+    private void btnCompassWest_Click(object? sender, EventArgs e)
+    {
+        _pidCompassRollDeg = -10.0;
+        ApplyPidCompassCommand();
+    }
+
+    private void btnCompassEast_Click(object? sender, EventArgs e)
+    {
+        _pidCompassRollDeg = 10.0;
+        ApplyPidCompassCommand();
+    }
+
+    private void btnCompassClear_Click(object? sender, EventArgs e)
+    {
+        _pidCompassRollDeg = 0.0;
+        _pidCompassPitchDeg = 0.0;
+        ApplyPidCompassCommand();
+    }
     private async void btnReadFcPid_Click(object sender, EventArgs e) => await ReadFcPidValuesAsync();
     private void btnSaveFcPid_Click(object sender, EventArgs e) => SaveFcPidValues();
     private void btnPidEditable_Click(object sender, EventArgs e) => SetPidGridEditable(!_pidGridEditable);

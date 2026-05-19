@@ -11,6 +11,9 @@ public sealed class SerialPortService : IDisposable
     private const int MspFcVariant = 2;
     private const int MspFcVersion = 3;
     private const int MspAttitude = 108;
+    private const int MspStatus = 101;
+    private const int MspBoxNames = 116;
+    private const int MspBoxIds = 119;
     private const int Msp2CommonSetting = 0x1003;
     private const int Msp2CommonSetSetting = 0x1004;
     private const int Msp2CommonSettingInfo = 0x1007;
@@ -241,6 +244,61 @@ public sealed class SerialPortService : IDisposable
     public void SaveSettings(double timeoutSeconds = 1.2)
     {
         _ = Request(MspEepromWrite, timeoutSeconds);
+    }
+
+    public FcModeValidationSnapshot ReadModeValidation(double timeoutSeconds = 1.0)
+    {
+        int? airmodeType = null;
+        try
+        {
+            airmodeType = GetSettingInt("airmode_type", timeoutSeconds);
+        }
+        catch
+        {
+            // Some INAV targets may not expose this setting name.
+        }
+
+        var activeModes = ReadActiveModes(timeoutSeconds);
+        var airmodeActive = activeModes.Any(name =>
+            name.Contains("AIR", StringComparison.OrdinalIgnoreCase));
+        var selfLevelingActive = activeModes.Any(name =>
+            name.Contains("ANGLE", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("HORIZON", StringComparison.OrdinalIgnoreCase));
+
+        return new FcModeValidationSnapshot(airmodeType, airmodeActive, selfLevelingActive, activeModes);
+    }
+
+    private IReadOnlyList<string> ReadActiveModes(double timeoutSeconds)
+    {
+        var namesPayload = Request(MspBoxNames, timeoutSeconds);
+        var idsPayload = Request(MspBoxIds, timeoutSeconds);
+        var statusPayload = Request(MspStatus, timeoutSeconds);
+        if (statusPayload.Length < 10)
+        {
+            return Array.Empty<string>();
+        }
+
+        var namesText = System.Text.Encoding.ASCII.GetString(namesPayload).TrimEnd('\0');
+        var names = namesText
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var modeFlags =
+            statusPayload[6]
+            | (statusPayload[7] << 8)
+            | (statusPayload[8] << 16)
+            | (statusPayload[9] << 24);
+
+        var active = new List<string>();
+        var max = Math.Min(Math.Min(names.Length, idsPayload.Length), 32);
+        for (var i = 0; i < max; i++)
+        {
+            if (((modeFlags >> i) & 0x1) != 0)
+            {
+                active.Add(names[i]);
+            }
+        }
+
+        return active;
     }
 
     private void ProbeInav()
@@ -952,3 +1010,9 @@ public sealed class SerialPortService : IDisposable
         Disconnect();
     }
 }
+
+public readonly record struct FcModeValidationSnapshot(
+    int? AirmodeType,
+    bool AirmodeActive,
+    bool SelfLevelingActive,
+    IReadOnlyList<string> ActiveModes);
