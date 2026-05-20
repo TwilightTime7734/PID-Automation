@@ -1,4 +1,5 @@
 using System.IO.Ports;
+using System.Diagnostics;
 
 namespace DronePidTuningAssistant.WinForms.Services;
 
@@ -239,6 +240,7 @@ public sealed class ArduinoTrainerCableClient : IDisposable
         {
             Buffer.BlockCopy(payload, 0, packet, 2, payload.Length);
         }
+        // Send packet to Arduino trainer cable
         serial.Write(packet, 0, packet.Length);
         serial.BaseStream.Flush();
     }

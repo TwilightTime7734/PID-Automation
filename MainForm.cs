@@ -81,16 +81,13 @@ public sealed partial class MainForm : Form
     private TextBox? _txtPidThrottleValue;
     private TextBox? _txtPidAngleValue;
     private int _pidTuneThrottleUs = 1150;
-    private Panel? _pidCompassPanel;
-    private Button? _btnCompassNorth;
-    private Button? _btnCompassSouth;
-    private Button? _btnCompassWest;
-    private Button? _btnCompassEast;
-    private Button? _btnCompassClear;
     private double _pidCompassRollDeg;
     private double _pidCompassPitchDeg;
     private double _measuredRollDeg;
     private double _measuredPitchDeg;
+    private Services.PidController? _rollPid;
+    private Services.PidController? _pitchPid;
+    private DateTime _lastPidComputeAt = DateTime.UtcNow;
 
     // Stick UI controls for channel test visualizers
     private Panel _pnlLeftStick => pnlLeftStick;
@@ -133,7 +130,20 @@ public sealed partial class MainForm : Form
         cboCH3.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
         cboCH4.SelectedIndexChanged += (_, _) => RefreshStickVisualsFromChannelState();
         InitializePidWorkflow();
-        InitializeTunePidCompassControl();
+        // Initialize local PID controllers (trainer-side corrective loop)
+        try
+        {
+            _rollPid = new PidController((double)nudRollKp.Value, (double)nudRollKi.Value, (double)nudRollKd.Value);
+            _pitchPid = new PidController((double)nudPitchKp.Value, (double)nudPitchKi.Value, (double)nudPitchKd.Value);
+            _rollPid.OutputMin = -MaxCommandDeg;
+            _rollPid.OutputMax = MaxCommandDeg;
+            _pitchPid.OutputMin = -MaxCommandDeg;
+            _pitchPid.OutputMax = MaxCommandDeg;
+        }
+        catch
+        {
+            // Designer numeric controls may not be available in some contexts; controllers will be initialized later.
+        }
         InitializeStickVisuals();
         InitializeLiveAttitudePolling();
         UpdateSimulationToggleVisual();
@@ -970,10 +980,7 @@ public sealed partial class MainForm : Form
 
     private static void SetWorkflowStatus(string text)
     {
-        if (!string.IsNullOrWhiteSpace(text))
-        {
-            Debug.WriteLine(text);
-        }
+        // Intentionally left blank to avoid debug output in release UI.
     }
 
     private ControlPath GetActiveControlPath()
@@ -1585,6 +1592,84 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private void nudRollKp_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_rollPid is null && nudRollKp is not null)
+        {
+            _rollPid = new PidController((double)nudRollKp.Value, (double)nudRollKi.Value, (double)nudRollKd.Value) { OutputMin = -MaxCommandDeg, OutputMax = MaxCommandDeg };
+        }
+        if (_rollPid is not null)
+        {
+            _rollPid.Kp = (double)nudRollKp.Value;
+            _rollPid.Reset();
+        }
+    }
+
+    private void nudRollKi_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_rollPid is null && nudRollKp is not null)
+        {
+            _rollPid = new PidController((double)nudRollKp.Value, (double)nudRollKi.Value, (double)nudRollKd.Value) { OutputMin = -MaxCommandDeg, OutputMax = MaxCommandDeg };
+        }
+        if (_rollPid is not null)
+        {
+            _rollPid.Ki = (double)nudRollKi.Value;
+            _rollPid.Reset();
+        }
+    }
+
+    private void nudRollKd_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_rollPid is null && nudRollKp is not null)
+        {
+            _rollPid = new PidController((double)nudRollKp.Value, (double)nudRollKi.Value, (double)nudRollKd.Value) { OutputMin = -MaxCommandDeg, OutputMax = MaxCommandDeg };
+        }
+        if (_rollPid is not null)
+        {
+            _rollPid.Kd = (double)nudRollKd.Value;
+            _rollPid.Reset();
+        }
+    }
+
+    private void nudPitchKp_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_pitchPid is null && nudPitchKp is not null)
+        {
+            _pitchPid = new PidController((double)nudPitchKp.Value, (double)nudPitchKi.Value, (double)nudPitchKd.Value) { OutputMin = -MaxCommandDeg, OutputMax = MaxCommandDeg };
+        }
+        if (_pitchPid is not null)
+        {
+            _pitchPid.Kp = (double)nudPitchKp.Value;
+            _pitchPid.Reset();
+        }
+    }
+
+    private void nudPitchKi_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_pitchPid is null && nudPitchKp is not null)
+        {
+            _pitchPid = new PidController((double)nudPitchKp.Value, (double)nudPitchKi.Value, (double)nudPitchKd.Value) { OutputMin = -MaxCommandDeg, OutputMax = MaxCommandDeg };
+        }
+        if (_pitchPid is not null)
+        {
+            _pitchPid.Ki = (double)nudPitchKi.Value;
+            _pitchPid.Reset();
+        }
+    }
+
+    private void nudPitchKd_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_pitchPid is null && nudPitchKp is not null)
+        {
+            _pitchPid = new PidController((double)nudPitchKp.Value, (double)nudPitchKi.Value, (double)nudPitchKd.Value) { OutputMin = -MaxCommandDeg, OutputMax = MaxCommandDeg };
+        }
+        if (_pitchPid is not null)
+        {
+            _pitchPid.Kd = (double)nudPitchKd.Value;
+            _pitchPid.Reset();
+        }
+    }
+
     private void UpdatePidAngleDisplay()
     {
         if (_txtPidAngleValue is not null)
@@ -1612,71 +1697,6 @@ public sealed partial class MainForm : Form
         SetWorkflowStatus($"Tune PID throttle set to {_pidTuneThrottleUs}us.");
     }
 
-    private void InitializeTunePidCompassControl()
-    {
-        if (_pidCompassPanel is not null)
-        {
-            return;
-        }
-
-        _pidCompassPanel = new Panel
-        {
-            Name = "pnlPidCompass",
-            Location = new Point(418, 145),
-            Size = new Size(148, 148),
-            Anchor = AnchorStyles.Top | AnchorStyles.Right,
-        };
-
-        _btnCompassNorth = new Button
-        {
-            Name = "btnCompassNorth",
-            Text = "N",
-            Size = new Size(42, 34),
-            Location = new Point(53, 2),
-        };
-        _btnCompassSouth = new Button
-        {
-            Name = "btnCompassSouth",
-            Text = "S",
-            Size = new Size(42, 34),
-            Location = new Point(53, 112),
-        };
-        _btnCompassWest = new Button
-        {
-            Name = "btnCompassWest",
-            Text = "W",
-            Size = new Size(42, 34),
-            Location = new Point(2, 57),
-        };
-        _btnCompassEast = new Button
-        {
-            Name = "btnCompassEast",
-            Text = "E",
-            Size = new Size(42, 34),
-            Location = new Point(104, 57),
-        };
-        _btnCompassClear = new Button
-        {
-            Name = "btnCompassClear",
-            Text = "Clear",
-            Size = new Size(50, 34),
-            Location = new Point(49, 57),
-        };
-
-        _btnCompassNorth.Click += btnCompassNorth_Click;
-        _btnCompassSouth.Click += btnCompassSouth_Click;
-        _btnCompassWest.Click += btnCompassWest_Click;
-        _btnCompassEast.Click += btnCompassEast_Click;
-        _btnCompassClear.Click += btnCompassClear_Click;
-
-        _pidCompassPanel.Controls.Add(_btnCompassNorth);
-        _pidCompassPanel.Controls.Add(_btnCompassSouth);
-        _pidCompassPanel.Controls.Add(_btnCompassWest);
-        _pidCompassPanel.Controls.Add(_btnCompassEast);
-        _pidCompassPanel.Controls.Add(_btnCompassClear);
-        groupBox1.Controls.Add(_pidCompassPanel);
-        _pidCompassPanel.BringToFront();
-    }
 
     private void ApplyPidCompassCommand()
     {
@@ -1977,7 +1997,6 @@ public sealed partial class MainForm : Form
         btnTunePitch.Enabled = enabled;
         btnTuneYaw.Enabled = enabled;
         btnRetestAxis.Enabled = enabled;
-        btnFinishAxis.Enabled = enabled;
         btnApplyRecommendedPid.Enabled = enabled;
         btnManualPidMinus.Enabled = enabled;
         btnManualPidPlus.Enabled = enabled;
